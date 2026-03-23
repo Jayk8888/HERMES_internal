@@ -1,0 +1,47 @@
+
+#First, install these things in your vent or elsewhere. These are necessary
+
+1. Node.js: https://nodejs.org/
+2. Docker Desktop: https://www.docker.com/products/docker-desktop/
+3. Git: https://git-scm.com/
+
+#These are for the initialisation
+
+# Clone repo into project folder
+git clone https://github.com/RiddhimaanD/HERMES_internal.git
+
+cd HERMES_internal
+
+# Install dependencies
+npm install
+
+To make a new database with the current relational schema, create a new project in Supabase. Then use through terminal:
+
+# Login to Supabase
+npx supabase login
+
+
+npx supabase link --project-ref project_id
+
+#This is to push current changes into your project
+npx supabase db push
+
+#This is just your usual workflow, ig you'll only need it once or twice
+
+#pull from main
+git checkout main
+git pull origin main
+
+#just in case backend is changed
+npx supabase db push
+
+#new branch, replace branch name
+git checkout -b new_branch
+
+#add changes
+git add .
+git commit -m "desc"
+
+#push changes
+git push -u origin new_branch
+

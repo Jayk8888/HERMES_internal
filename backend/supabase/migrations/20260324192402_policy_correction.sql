@@ -92,3 +92,5 @@ BEGIN
   WHERE id = appointment_id;
 END;
 $$;
+
+;

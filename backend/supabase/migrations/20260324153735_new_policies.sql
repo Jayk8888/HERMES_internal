@@ -24,10 +24,7 @@ CREATE POLICY "Users can update name but not role"
 ON public.profiles FOR UPDATE
 TO authenticated
 USING (auth.uid() = id)
-WITH CHECK (
-  auth.uid() = id AND
-  role = (SELECT role FROM public.profiles WHERE id = auth.uid())
-);
+WITH CHECK (auth.uid() = id);
  
 CREATE POLICY "No direct inserts on profiles"
 ON public.profiles FOR INSERT

@@ -3,7 +3,6 @@ import { RoleGuard } from './RoleGuard'
 
 import Home from '../pages/Home'
 import Login from '../pages/Login'
-import NotFound from '../pages/NotFound'
 import Signup from '../pages/Signup'
 import Unauthorized from '../pages/Unauthorized'
 
@@ -30,7 +29,6 @@ export const router = createBrowserRouter([
   { path: '/login', element: <Login /> },
   { path: '/signup', element: <Signup /> },
   { path: '/unauthorized', element: <Unauthorized /> },
-  { path: '*', element: <NotFound /> },
 
   {
     path: '/patient',

@@ -20,6 +20,7 @@ export function AuthProvider({ children }) {
       (_event, session) => {
         setUser(session?.user ?? null)
         if (session?.user) {
+          setLoading(true)
           setTimeout(() => {
             void fetchProfile(session.user.id)
           }, 0)

@@ -17,6 +17,7 @@ import PatientRecordDetail from '../pages/patient/RecordDetail'
 import PatientDoctors from '../pages/patient/Doctors'
 import PatientProfile from '../pages/patient/Profile'
 
+import DoctorCompleteProfile from '../pages/doctor/CompleteProfile'
 import DoctorDashboard from '../pages/doctor/Dashboard'
 import DoctorAppointments from '../pages/doctor/Appointments'
 import DoctorAppointmentDetail from '../pages/doctor/AppointmentDetail'
@@ -99,4 +100,5 @@ export const router = createBrowserRouter([
     path: '/doctor/profile',
     element: <RoleGuard role="doctor"><DoctorProfile /></RoleGuard>,
   },
+  { path: '/doctor/complete-profile', element: <DoctorCompleteProfile /> },
 ])

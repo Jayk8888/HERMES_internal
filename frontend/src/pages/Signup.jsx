@@ -18,7 +18,7 @@ export default function Signup() {
     setLoading(true)
     try {
       await signUp({ email, password, fullName, role })
-      navigate(role === 'doctor' ? '/doctor' : '/patient')
+      navigate('/')
     } catch (err) {
       setError(err.message)
     } finally {

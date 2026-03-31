@@ -130,6 +130,13 @@ export default function DoctorPatientDetail() {
                 <p style={{ margin: 0, fontSize: '0.95rem' }}>{profile.email || '—'}</p>
               </div>
 
+              <div style={{ marginBottom: '1.5rem' }}>
+                <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '0.75rem', textTransform: 'uppercase', color: '#9ca3af', fontWeight: 600 }}>
+                  Phone
+                </h3>
+                <p style={{ margin: 0, fontSize: '0.95rem' }}>{profile.phone_number || '—'}</p>
+              </div>
+
               <div>
                 <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '0.75rem', textTransform: 'uppercase', color: '#9ca3af', fontWeight: 600 }}>
                   Account Status

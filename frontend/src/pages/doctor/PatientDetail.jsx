@@ -8,7 +8,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { supabase } from '../../lib/supabase'
 
 export default function DoctorPatientDetail() {
-  const { patientId } = useParams()
+  const { id: patientId } = useParams()
   const { user } = useAuth()
 
   // Fetch patient profile + patient data + all their medical records

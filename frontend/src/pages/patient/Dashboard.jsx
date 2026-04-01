@@ -33,7 +33,7 @@ export default function PatientDashboard() {
           .eq('patient_id', user.id),
         supabase
           .from('medical_records')
-          .select('created_at')
+          .select('created_at', { count: 'exact' })
           .order('created_at', { ascending: false })
           .limit(1)
       ])
@@ -104,7 +104,6 @@ export default function PatientDashboard() {
           <h1 style={{ marginBottom: '0.5rem' }}>Welcome back!</h1>
           <p style={{ color: 'gray' }}>Here's your health dashboard</p>
         </div>
-
         {/* Stats Grid */}
         <div style={{
           display: 'grid',

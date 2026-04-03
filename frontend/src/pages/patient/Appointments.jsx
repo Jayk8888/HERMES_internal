@@ -1,3 +1,4 @@
+import { CalendarPlus2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import PageLayout from '../../components/layout/PageLayout'
 import Button from '../../components/ui/Button'
@@ -46,6 +47,12 @@ export default function PatientAppointments() {
         <SectionHeader
           title="Appointments"
           description="Review scheduled, completed, and cancelled visits with direct access to each appointment detail."
+          actions={(
+            <Button as={Link} to="/patient/appointments/book">
+              <CalendarPlus2 className="h-4 w-4" />
+              Book appointment
+            </Button>
+          )}
         />
 
         {loading ? <LoadingSpinner message="Loading appointments..." /> : null}

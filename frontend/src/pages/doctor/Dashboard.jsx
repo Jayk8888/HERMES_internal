@@ -82,7 +82,7 @@ export default function DoctorDashboard() {
               </p>
             </div>
 
-            <div className="rounded-[28px] border border-white/10 bg-white/10 p-5">
+            <div className="border-t border-white/10 pt-5 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary-50/70">
                 Daily overview
               </p>

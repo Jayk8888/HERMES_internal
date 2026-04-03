@@ -193,7 +193,6 @@ export default function PatientProfile() {
                   <Select id="patient-gender" name="gender" value={form.gender} onChange={handleChange}>
                     <option value="male">Male</option>
                     <option value="female">Female</option>
-                    <option value="other">Other</option>
                   </Select>
                 </Field>
 

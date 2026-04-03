@@ -1,4 +1,4 @@
-import { CalendarPlus2, Stethoscope } from 'lucide-react'
+import { Stethoscope } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import PageLayout from '../../components/layout/PageLayout'
 import Button from '../../components/ui/Button'
@@ -58,6 +58,14 @@ function groupDoctors(appointments = []) {
   })
 }
 
+function formatDoctorName(fullName) {
+  const normalized = typeof fullName === 'string' ? fullName.trim() : ''
+  if (!normalized) return 'Doctor'
+  if (normalized.toLowerCase() === 'doctor') return 'Doctor'
+  if (/^dr\.?\s+/i.test(normalized)) return normalized.replace(/^dr\.?\s+/i, 'Dr. ')
+  return `Dr. ${normalized}`
+}
+
 export default function PatientDoctors() {
   const { user, loading: authLoading } = useAuth()
 
@@ -93,25 +101,11 @@ export default function PatientDoctors() {
   }
 
   return (
-    <PageLayout
-      width="wide"
-      actions={(
-        <Button as={Link} to="/patient/appointments/book">
-          <CalendarPlus2 className="h-4 w-4" />
-          Book appointment
-        </Button>
-      )}
-    >
+    <PageLayout width="wide">
       <div className="space-y-6">
         <SectionHeader
           title="Connected doctors"
           description="Doctors appear here after you book or complete appointments with them."
-          actions={(
-            <Button as={Link} to="/patient/appointments/book">
-              <CalendarPlus2 className="h-4 w-4" />
-              Book appointment
-            </Button>
-          )}
         />
 
         {loading ? <LoadingSpinner message="Loading your doctors..." /> : null}
@@ -122,11 +116,6 @@ export default function PatientDoctors() {
             icon={<Stethoscope className="h-5 w-5" />}
             title="No doctors connected yet"
             description="Once you book an appointment, your doctors will appear here with their visit history."
-            action={(
-              <Button as={Link} to="/patient/appointments/book">
-                Book an appointment
-              </Button>
-            )}
           />
         ) : null}
 
@@ -135,11 +124,8 @@ export default function PatientDoctors() {
             {data.map(doctor => (
               <div key={doctor.id} className="grid gap-4 px-5 py-5 sm:px-6 lg:grid-cols-[1.3fr_0.8fr_0.9fr] lg:items-start">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                    Doctor
-                  </p>
-                  <h3 className="mt-2 text-lg font-semibold text-slate-900">
-                    Dr. {doctor.fullName}
+                  <h3 className="text-lg font-semibold text-slate-900">
+                    {formatDoctorName(doctor.fullName)}
                   </h3>
                   <p className="mt-1 text-sm text-slate-500">{doctor.specialization}</p>
                 </div>

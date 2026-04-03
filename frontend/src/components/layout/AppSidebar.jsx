@@ -28,6 +28,10 @@ const ICONS = {
 }
 
 function matchesPath(pathname, path) {
+  if (path === '/doctor' || path === '/patient') {
+    return pathname === path
+  }
+
   return pathname === path || pathname.startsWith(`${path}/`)
 }
 

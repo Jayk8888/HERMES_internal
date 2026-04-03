@@ -1,4 +1,4 @@
-import { CalendarDays, CalendarPlus2, FileText, Stethoscope, UserCog } from 'lucide-react'
+import { CalendarDays, CalendarPlus2, FileText, Stethoscope } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import PageLayout from '../../components/layout/PageLayout'
 import Button from '../../components/ui/Button'
@@ -8,11 +8,10 @@ import ErrorMessage from '../../components/ui/ErrorMessage'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import MetricCard from '../../components/ui/MetricCard'
 import SectionHeader from '../../components/ui/SectionHeader'
-import StatusBadge from '../../components/ui/StatusBadge'
 import { useFetch } from '../../hooks/useFetch'
 import { useAuth } from '../../hooks/useAuth'
 import { getProfileName, pickFirst } from '../../lib/data'
-import { formatDateTime } from '../../lib/formatters'
+import { formatDate, formatDateTime } from '../../lib/formatters'
 import { supabase } from '../../lib/supabase'
 
 export default function PatientDashboard() {
@@ -100,23 +99,16 @@ export default function PatientDashboard() {
   }
 
   return (
-    <PageLayout
-      width="wide"
-      actions={(
-        <Button as={Link} to="/patient/appointments/book">
-          <CalendarPlus2 className="h-4 w-4" />
-          Book appointment
-        </Button>
-      )}
-    >
+    <PageLayout width="wide">
       <div className="space-y-6">
         <Card tone="brand">
           <div className="grid gap-6 lg:grid-cols-[1.4fr_0.8fr]">
-            <div>
+            <div className="flex h-full flex-col">
               <h2 className="font-display text-4xl font-semibold tracking-tight text-white">
                 Welcome back, {profile?.full_name?.split(' ')[0] ?? 'there'}
               </h2>
-              <div className="mt-5 flex flex-wrap gap-3">
+              <div className="mt-auto pt-5">
+                <div className="flex flex-wrap gap-3">
                 <Button as={Link} to="/patient/appointments/book" className="bg-white text-primary-800 hover:bg-primary-50">
                   <CalendarPlus2 className="h-4 w-4" />
                   Book appointment
@@ -125,6 +117,7 @@ export default function PatientDashboard() {
                   <FileText className="h-4 w-4" />
                   View records
                 </Button>
+                </div>
               </div>
             </div>
 
@@ -206,79 +199,60 @@ export default function PatientDashboard() {
           ) : null}
 
           {!appointmentsLoading && !appointmentsError && upcomingAppointments?.length > 0 ? (
-            <Card className="divide-y divide-slate-200/80 overflow-hidden p-0">
+            <div className="space-y-4">
               {upcomingAppointments.map(appointment => {
                 const doctor = pickFirst(appointment.doctor)
                 const doctorProfile = pickFirst(doctor?.profiles)
 
                 return (
-                  <Link
-                    key={appointment.id}
-                    to={`/patient/appointments/${appointment.id}`}
-                    className="block px-5 py-5 no-underline transition-colors hover:bg-slate-50/75 sm:px-6"
-                  >
-                    <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                          Scheduled visit
-                        </p>
-                        <h3 className="mt-2 text-lg font-semibold text-slate-900">
+                  <Card key={appointment.id} interactive className="space-y-4">
+                    <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                      <div className="min-w-0">
+                        <h3 className="font-display text-xl font-semibold tracking-tight text-slate-900">
                           Dr. {getProfileName(doctorProfile)}
                         </h3>
-                        <div className="mt-2 space-y-1 text-sm text-slate-500">
-                          <p>{doctor?.specialization || 'Specialization not available'}</p>
-                          <p>{formatDateTime(appointment.scheduled_at)}</p>
-                          <p>{doctorProfile?.email || 'No email available'}</p>
+                        <p className="mt-1 text-sm text-slate-500">
+                          {doctor?.specialization || 'Specialization not available'}
+                        </p>
+                        <p className="mt-2 text-xs text-slate-400">
+                          {doctorProfile?.email || 'No email available'}
+                        </p>
+                      </div>
+
+                      <div className="flex flex-col gap-3 xl:items-end">
+                        <div className="min-w-[10rem] xl:text-right">
+                          <p className="text-base font-semibold text-slate-900">
+                            {formatDate(appointment.scheduled_at, { weekday: 'short', day: 'numeric', month: 'short' })}
+                          </p>
+                          <p className="mt-1 text-sm text-slate-500">
+                            {formatDateTime(appointment.scheduled_at, { hour: 'numeric', minute: '2-digit' })}
+                          </p>
                         </div>
                       </div>
-                      <StatusBadge status={appointment.status} />
                     </div>
-                  </Link>
+
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                      <p className="flex-1 text-sm leading-relaxed text-slate-600">
+                        Your appointment is confirmed and ready to open from the detailed visit view.
+                      </p>
+
+                      <Button
+                        as={Link}
+                        to={`/patient/appointments/${appointment.id}`}
+                        variant="primary"
+                        size="medium"
+                        className="w-full shrink-0 sm:w-auto"
+                      >
+                        View appointment
+                      </Button>
+                    </div>
+                  </Card>
                 )
               })}
-            </Card>
+            </div>
           ) : null}
         </section>
 
-        <section className="space-y-4">
-          <SectionHeader
-            eyebrow="Quick actions"
-            title="Move quickly"
-            description="Jump directly into the workflows patients use most often."
-          />
-
-          <Card tone="subtle" className="grid divide-y divide-slate-200/80 overflow-hidden p-0 md:grid-cols-3 md:divide-x md:divide-y-0">
-            <Link to="/patient/appointments/book" className="block px-5 py-5 no-underline transition-colors hover:bg-white/70 sm:px-6">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-primary-100 bg-white/80 text-primary-700">
-                <CalendarPlus2 className="h-5 w-5" />
-              </div>
-              <h3 className="mt-4 text-lg font-semibold text-slate-900">Book a new appointment</h3>
-              <p className="mt-2 text-sm leading-relaxed text-slate-500">
-                Browse doctors, inspect availability, and schedule a visit in a guided flow.
-              </p>
-            </Link>
-
-            <Link to="/patient/doctors" className="block px-5 py-5 no-underline transition-colors hover:bg-white/70 sm:px-6">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-primary-100 bg-white/80 text-primary-700">
-                <Stethoscope className="h-5 w-5" />
-              </div>
-              <h3 className="mt-4 text-lg font-semibold text-slate-900">Review connected doctors</h3>
-              <p className="mt-2 text-sm leading-relaxed text-slate-500">
-                See the doctors tied to your existing and past appointments.
-              </p>
-            </Link>
-
-            <Link to="/patient/profile" className="block px-5 py-5 no-underline transition-colors hover:bg-white/70 sm:px-6">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-primary-100 bg-white/80 text-primary-700">
-                <UserCog className="h-5 w-5" />
-              </div>
-              <h3 className="mt-4 text-lg font-semibold text-slate-900">Update your profile</h3>
-              <p className="mt-2 text-sm leading-relaxed text-slate-500">
-                Keep your personal information and clinical identity details current.
-              </p>
-            </Link>
-          </Card>
-        </section>
       </div>
     </PageLayout>
   )

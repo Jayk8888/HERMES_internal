@@ -127,10 +127,10 @@ function getDaySummary(appointmentsForDay = []) {
 function getStatusTone(status) {
   if (status === 'scheduled') {
     return {
-      cardClassName: 'border-primary-200 bg-primary-50/95 text-primary-950 shadow-[0_18px_28px_-26px_rgba(14,116,144,0.55)]',
-      timeClassName: 'text-primary-700',
-      accentClassName: 'bg-primary-500',
-      linkClassName: 'text-primary-700 hover:text-primary-800',
+      cardClassName: 'border-info/25 bg-info-light/95 text-info-dark shadow-[0_18px_28px_-26px_rgba(37,99,235,0.32)]',
+      timeClassName: 'text-info-dark/80',
+      accentClassName: 'bg-info',
+      linkClassName: 'text-info-dark hover:text-info-dark',
     }
   }
 
@@ -347,8 +347,8 @@ function MonthDayPicker({
               className={cn(
                 'relative flex aspect-square items-start justify-start rounded-2xl border px-3 py-2 text-sm font-semibold transition-colors',
                 isSelected && 'border-primary-600 bg-primary-600 text-white shadow-sm',
-                !isSelected && summary.count > 0 && cell.inCurrentMonth && 'border-success/20 bg-success-light/55 text-slate-900 hover:border-success/30 hover:bg-success-light/75',
-                !isSelected && summary.count > 0 && !cell.inCurrentMonth && 'border-success/10 bg-success-light/25 text-slate-400 hover:bg-success-light/35',
+                !isSelected && summary.count > 0 && cell.inCurrentMonth && 'border-success/30 bg-success-light/75 text-slate-900 hover:border-success/40 hover:bg-success-light/90',
+                !isSelected && summary.count > 0 && !cell.inCurrentMonth && 'border-success/20 bg-success-light/40 text-slate-400 hover:bg-success-light/55',
                 !isSelected && summary.count === 0 && cell.inCurrentMonth && 'border-transparent bg-white text-slate-800 hover:border-primary-100 hover:bg-primary-50/60',
                 !isSelected && summary.count === 0 && !cell.inCurrentMonth && 'border-transparent bg-transparent text-slate-300 hover:bg-slate-50',
                 isToday && !isSelected && 'ring-2 ring-primary-200'
@@ -447,7 +447,7 @@ function DayTimeline({ selectedDate, selectedDateAppointments, todayKey, onToday
 
       <div className="overflow-x-auto">
         <div className="min-w-[42rem]">
-          <div className="grid grid-cols-[4.5rem_minmax(0,1fr)] gap-4">
+          <div className="grid grid-cols-[3.25rem_minmax(0,1fr)] gap-3">
             <div className="relative" style={{ height: totalHeight }}>
               {hours.map((hour, index) => (
                 <div
@@ -455,7 +455,7 @@ function DayTimeline({ selectedDate, selectedDateAppointments, todayKey, onToday
                   className="absolute left-0 right-0 text-right text-xs font-medium text-slate-400"
                   style={{ top: index * HOUR_HEIGHT - 9 }}
                 >
-                  {formatDateTime(new Date(2026, 0, 1, hour), { hour: 'numeric' })}
+                  {index === 0 ? null : formatDateTime(new Date(2026, 0, 1, hour), { hour: 'numeric' })}
                 </div>
               ))}
             </div>
@@ -506,20 +506,20 @@ function DayTimeline({ selectedDate, selectedDateAppointments, todayKey, onToday
                             {formatTimeRange(item.appointment.scheduled_at, endAt)}
                           </p>
                         </div>
+                        <div className="self-center">
+                          <StatusBadge status={item.appointment.status} />
+                        </div>
                         <Button
                           as={Link}
                           to={`/doctor/appointments/${item.appointment.id}`}
                           variant="secondary"
                           size="xs"
-                          className={cn('shrink-0 whitespace-nowrap border-white/70 bg-white/80 px-2 py-1 text-[11px] shadow-none', statusTone.linkClassName)}
+                          className={cn('self-center shrink-0 whitespace-nowrap border-white/70 bg-white/80 px-2 py-1 text-[11px] shadow-none', statusTone.linkClassName)}
                         >
                           View details
                         </Button>
                       </div>
 
-                      <div className="mt-3 flex items-center">
-                        <span className={cn('h-2 w-2 rounded-full', statusTone.accentClassName)} aria-hidden="true" />
-                      </div>
                     </div>
                   </div>
                 )
@@ -588,8 +588,6 @@ export default function DoctorAppointments() {
   const selectedDate = dateFromKey(selectedDateKey) || today
   const selectedDateAppointments = appointmentsByDate.get(selectedDateKey) || []
   const yearOptions = useMemo(() => buildYearOptions(appointments, today.getFullYear()), [appointments, today])
-  const monthLabel = `${MONTH_NAMES[viewMonth]} ${viewYear}`
-
   function handleVisibleMonthChange(nextYear, nextMonth) {
     setViewYear(nextYear)
     setViewMonth(nextMonth)
@@ -628,19 +626,6 @@ export default function DoctorAppointments() {
         <SectionHeader
           title="Appointments"
           description="Choose a day from the month picker, then review the selected date in a focused time-based schedule."
-          actions={appointments.length > 0 ? (
-            <>
-              <div className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-600">
-                {monthLabel}
-              </div>
-              <div className="inline-flex items-center rounded-full border border-primary-100 bg-primary-50 px-3 py-1.5 text-sm font-medium text-primary-700">
-                {formatAppointmentCount(selectedDateAppointments.length)} on {formatDate(selectedDate, {
-                  day: 'numeric',
-                  month: 'short',
-                })}
-              </div>
-            </>
-          ) : null}
         />
 
         {loading ? <LoadingSpinner message="Loading appointments..." /> : null}

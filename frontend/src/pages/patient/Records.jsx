@@ -70,7 +70,7 @@ export default function PatientRecords() {
           title="Medical records"
           description="Review appointment-linked clinical notes, prescriptions, and recorded vitals."
           actions={(
-            <Button as={Link} to="/patient/appointments/book" variant="secondary">
+            <Button as={Link} to="/patient/appointments/book">
               <CalendarPlus2 className="h-4 w-4" />
               Book appointment
             </Button>

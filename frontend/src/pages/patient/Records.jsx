@@ -108,9 +108,6 @@ export default function PatientRecords() {
                 >
                   <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr_auto] lg:items-center">
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                        Doctor
-                      </p>
                       <h3 className="mt-2 text-lg font-semibold text-slate-900">
                         Dr. {doctorProfile?.full_name || 'Doctor'}
                       </h3>

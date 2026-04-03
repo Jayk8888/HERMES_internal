@@ -77,9 +77,6 @@ export default function DoctorAppointments() {
                       <h3 className="mt-2 text-lg font-semibold text-slate-900">
                         {patientProfile?.full_name || 'Unknown patient'}
                       </h3>
-                      <p className="mt-1 text-sm text-slate-500">
-                        {patientProfile?.email || 'No email available'}
-                      </p>
                     </div>
 
                     <div className="space-y-2 text-sm text-slate-500">

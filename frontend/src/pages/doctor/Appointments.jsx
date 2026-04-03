@@ -1,21 +1,36 @@
 import { Link } from 'react-router-dom'
 import PageLayout from '../../components/layout/PageLayout'
-import LoadingSpinner from '../../components/ui/LoadingSpinner'
+import Button from '../../components/ui/Button'
+import Card from '../../components/ui/Card'
+import EmptyState from '../../components/ui/EmptyState'
 import ErrorMessage from '../../components/ui/ErrorMessage'
+import LoadingSpinner from '../../components/ui/LoadingSpinner'
+import SectionHeader from '../../components/ui/SectionHeader'
+import StatusBadge from '../../components/ui/StatusBadge'
 import { useFetch } from '../../hooks/useFetch'
-import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
+import { formatDateTime } from '../../lib/formatters'
+import { supabase } from '../../lib/supabase'
+
+function getProfile(value) {
+  if (!value) return {}
+  return Array.isArray(value) ? value[0] : value
+}
 
 export default function DoctorAppointments() {
   const { user } = useAuth()
 
   const { data, loading, error, refetch } = useFetch(async () => {
-    if (!user?.id) return null
-    const { data: appts, error: fetchErr } = await supabase
+    if (!user?.id) return []
+
+    const { data: appointments, error: fetchError } = await supabase
       .from('appointments')
       .select(`
-        *,
+        id,
+        scheduled_at,
+        status,
         patients (
+          id,
           profiles (
             full_name,
             email
@@ -25,36 +40,65 @@ export default function DoctorAppointments() {
       .eq('doctor_id', user.id)
       .order('scheduled_at', { ascending: true })
 
-    if (fetchErr) throw fetchErr
-    return appts
-  }, [user?.id])
+    if (fetchError) throw fetchError
+    return appointments || []
+  }, [user?.id], { key: `doctor-appointments:${user?.id ?? 'anonymous'}` })
 
   return (
-    <PageLayout>
-      <h1>Doctor Appointments</h1>
-      {!user || loading ? (
-        <LoadingSpinner />
-      ) : error ? (
-        <ErrorMessage message={error} onRetry={refetch} />
-      ) : !data || data.length === 0 ? (
-        <p>No appointments found.</p>
-      ) : (
-        <div style={{ display: 'grid', gap: '1rem', marginTop: '1rem' }}>
-          {data.map(appt => (
-            <div key={appt.id} style={{ border: '1px solid #ddd', padding: '1.5rem', borderRadius: '8px' }}>
-              <h3>Patient: {Array.isArray(appt.patients?.profiles) ? appt.patients?.profiles[0]?.full_name : appt.patients?.profiles?.full_name || 'Unknown Patient'}</h3>
-              <p><strong>Email:</strong> {Array.isArray(appt.patients?.profiles) ? appt.patients?.profiles[0]?.email : appt.patients?.profiles?.email || 'N/A'}</p>
-              <p><strong>Date:</strong> {new Date(appt.scheduled_at).toLocaleString()}</p>
-              <p><strong>Status:</strong> {appt.status}</p>
-              <div style={{ marginTop: '1rem' }}>
-                <Link to={`/doctor/appointments/${appt.id}`} style={{ textDecoration: 'none', color: '#0066cc', fontWeight: 'bold' }}>
-                  View Details &rarr;
-                </Link>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+    <PageLayout width="wide">
+      <div className="space-y-6">
+        <SectionHeader
+          title="Appointments"
+          description="Review scheduled, completed, and cancelled visits with direct access to status updates and record creation."
+        />
+
+        {loading ? <LoadingSpinner message="Loading appointments..." /> : null}
+        {error ? <ErrorMessage message={error} onRetry={refetch} /> : null}
+
+        {loading || error ? null : data.length === 0 ? (
+          <EmptyState
+            icon="A"
+            title="No appointments found"
+            description="Appointments will appear here once patients start booking into your available slots."
+          />
+        ) : (
+          <div className="grid gap-4">
+            {data.map(appointment => {
+              const patient = getProfile(appointment.patients)
+              const patientProfile = getProfile(patient?.profiles)
+
+              return (
+                <Card key={appointment.id} className="space-y-4">
+                  <div className="grid gap-4 lg:grid-cols-[1.2fr_0.9fr_auto] lg:items-center">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                        Patient
+                      </p>
+                      <h3 className="mt-2 text-lg font-semibold text-slate-900">
+                        {patientProfile?.full_name || 'Unknown patient'}
+                      </h3>
+                      <p className="mt-1 text-sm text-slate-500">
+                        {patientProfile?.email || 'No email available'}
+                      </p>
+                    </div>
+
+                    <div className="space-y-2 text-sm text-slate-500">
+                      <p>{formatDateTime(appointment.scheduled_at)}</p>
+                      <StatusBadge status={appointment.status} />
+                    </div>
+
+                    <div className="lg:justify-self-end">
+                      <Button as={Link} to={`/doctor/appointments/${appointment.id}`}>
+                        View details
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+              )
+            })}
+          </div>
+        )}
+      </div>
     </PageLayout>
   )
 }

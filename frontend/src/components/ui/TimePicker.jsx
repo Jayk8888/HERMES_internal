@@ -1,13 +1,16 @@
-import { useState, useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { cn } from '../../lib/cn'
+import { inputClassName } from './TextInput'
 
 const RADIUS = 80
 const CENTER = 100
 
-function polarToXY(angle, r) {
-  const rad = (angle - 90) * (Math.PI / 180)
+function polarToXY(angle, radius) {
+  const radians = (angle - 90) * (Math.PI / 180)
+
   return {
-    x: CENTER + r * Math.cos(rad),
-    y: CENTER + r * Math.sin(rad)
+    x: CENTER + radius * Math.cos(radians),
+    y: CENTER + radius * Math.sin(radians),
   }
 }
 
@@ -15,6 +18,7 @@ function xyToAngle(x, y) {
   const dx = x - CENTER
   const dy = y - CENTER
   let angle = Math.atan2(dy, dx) * (180 / Math.PI) + 90
+
   if (angle < 0) angle += 360
   return angle
 }
@@ -22,78 +26,82 @@ function xyToAngle(x, y) {
 function ClockFace({ mode, value, onChange }) {
   const svgRef = useRef(null)
   const isDragging = useRef(false)
-
   const labels = mode === 'hour'
-    ? Array.from({ length: 12 }, (_, i) => i + 1)
-    : Array.from({ length: 12 }, (_, i) => i * 5)
+    ? Array.from({ length: 12 }, (_, index) => index + 1)
+    : Array.from({ length: 12 }, (_, index) => index * 5)
 
-  function angleFromValue(val) {
-    if (mode === 'hour') return ((val % 12) / 12) * 360
-    return (val / 60) * 360
+  function angleFromValue(rawValue) {
+    if (mode === 'hour') return ((rawValue % 12) / 12) * 360
+    return (rawValue / 60) * 360
   }
 
   function valueFromAngle(angle) {
     if (mode === 'hour') {
-      let h = Math.round(angle / 30) % 12
-      if (h === 0) h = 12
-      return h
+      let hour = Math.round(angle / 30) % 12
+      if (hour === 0) hour = 12
+      return hour
     }
+
     return Math.round(angle / 6) % 60
   }
 
-  function getXY(e) {
+  function getPoint(event) {
     const svg = svgRef.current
     if (!svg) return null
+
     const rect = svg.getBoundingClientRect()
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY
+    const clientX = event.touches ? event.touches[0].clientX : event.clientX
+    const clientY = event.touches ? event.touches[0].clientY : event.clientY
+
     return {
       x: ((clientX - rect.left) / rect.width) * 200,
-      y: ((clientY - rect.top) / rect.height) * 200
+      y: ((clientY - rect.top) / rect.height) * 200,
     }
   }
 
-  function handlePointer(e) {
-    const pos = getXY(e)
-    if (!pos) return
-    onChange(valueFromAngle(xyToAngle(pos.x, pos.y)))
+  function handlePointer(event) {
+    const point = getPoint(event)
+    if (!point) return
+    onChange(valueFromAngle(xyToAngle(point.x, point.y)))
   }
 
   const handAngle = angleFromValue(value)
-  const handPos = polarToXY(handAngle, RADIUS * 0.75)
+  const handPosition = polarToXY(handAngle, RADIUS * 0.75)
 
   return (
     <svg
       ref={svgRef}
       viewBox="0 0 200 200"
       style={{ width: 220, height: 220, cursor: 'grab', userSelect: 'none' }}
-      onMouseDown={e => { isDragging.current = true; handlePointer(e) }}
-      onMouseMove={e => { if (isDragging.current) handlePointer(e) }}
+      onMouseDown={event => { isDragging.current = true; handlePointer(event) }}
+      onMouseMove={event => { if (isDragging.current) handlePointer(event) }}
       onMouseUp={() => { isDragging.current = false }}
       onMouseLeave={() => { isDragging.current = false }}
-      onTouchStart={e => { isDragging.current = true; handlePointer(e) }}
-      onTouchMove={e => { if (isDragging.current) handlePointer(e) }}
+      onTouchStart={event => { isDragging.current = true; handlePointer(event) }}
+      onTouchMove={event => { if (isDragging.current) handlePointer(event) }}
       onTouchEnd={() => { isDragging.current = false }}
     >
-      <circle cx={CENTER} cy={CENTER} r={CENTER - 2} fill="#f0f6fa" stroke="#d4e8f0" strokeWidth="1.5" />
+      <circle cx={CENTER} cy={CENTER} r={CENTER - 2} fill="#eef8f8" stroke="#d8eeee" strokeWidth="1.5" />
 
-      {labels.map((label, i) => {
-        const angle = mode === 'hour' ? ((i + 1) / 12) * 360 : (i / 12) * 360
-        const pos = polarToXY(angle, RADIUS * 0.82)
+      {labels.map((label, index) => {
+        const angle = mode === 'hour' ? ((index + 1) / 12) * 360 : (index / 12) * 360
+        const point = polarToXY(angle, RADIUS * 0.82)
         const isActive = mode === 'hour'
           ? label === (value % 12 === 0 ? 12 : value % 12)
           : label === value
+
         return (
           <g key={label}>
-            <circle cx={pos.x} cy={pos.y} r={14} fill={isActive ? '#0e7fa8' : 'transparent'} />
+            <circle cx={point.x} cy={point.y} r={14} fill={isActive ? '#206f6d' : 'transparent'} />
             <text
-              x={pos.x} y={pos.y}
+              x={point.x}
+              y={point.y}
               textAnchor="middle"
               dominantBaseline="central"
               fontSize={12}
-              fontFamily="DM Sans, sans-serif"
-              fill={isActive ? 'white' : '#0b2d3e'}
-              fontWeight={isActive ? '600' : '400'}
+              fontFamily="Source Sans 3, sans-serif"
+              fill={isActive ? 'white' : '#0e2323'}
+              fontWeight={isActive ? '700' : '500'}
             >
               {mode === 'minute' ? String(label).padStart(2, '0') : label}
             </text>
@@ -102,14 +110,32 @@ function ClockFace({ mode, value, onChange }) {
       })}
 
       <line
-        x1={CENTER} y1={CENTER}
-        x2={handPos.x} y2={handPos.y}
-        stroke="#0e7fa8" strokeWidth="2.5" strokeLinecap="round"
+        x1={CENTER}
+        y1={CENTER}
+        x2={handPosition.x}
+        y2={handPosition.y}
+        stroke="#206f6d"
+        strokeWidth="2.5"
+        strokeLinecap="round"
       />
-      <circle cx={CENTER} cy={CENTER} r={4} fill="#0e7fa8" />
-      <circle cx={handPos.x} cy={handPos.y} r={6} fill="#0e7fa8" />
+      <circle cx={CENTER} cy={CENTER} r={4} fill="#206f6d" />
+      <circle cx={handPosition.x} cy={handPosition.y} r={6} fill="#206f6d" />
     </svg>
   )
+}
+
+function parseTimeValue(value) {
+  if (!value) {
+    return { hour: 9, minute: 0, ampm: 'AM' }
+  }
+
+  const [hours, minutes] = value.split(':').map(Number)
+
+  return {
+    hour: hours % 12 === 0 ? 12 : hours % 12,
+    minute: minutes,
+    ampm: hours >= 12 ? 'PM' : 'AM',
+  }
 }
 
 export default function TimePicker({ value, onChange, label }) {
@@ -121,138 +147,116 @@ export default function TimePicker({ value, onChange, label }) {
   const ref = useRef(null)
 
   useEffect(() => {
-    if (value) {
-      const [h, m] = value.split(':').map(Number)
-      setAmpm(h >= 12 ? 'PM' : 'AM')
-      setHour(h % 12 === 0 ? 12 : h % 12)
-      setMinute(m)
+    function handleDocumentClick(event) {
+      if (ref.current && !ref.current.contains(event.target)) {
+        setOpen(false)
+      }
     }
-  }, [value])
 
-  useEffect(() => {
-    function handleClick(e) {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
+    document.addEventListener('mousedown', handleDocumentClick)
+    return () => document.removeEventListener('mousedown', handleDocumentClick)
   }, [])
 
-  function commit(h, m, ap) {
-    let h24 = h % 12
-    if (ap === 'PM') h24 += 12
-    onChange(`${String(h24).padStart(2, '0')}:${String(m).padStart(2, '0')}`)
+  function syncFromValue() {
+    const parsed = parseTimeValue(value)
+    setHour(parsed.hour)
+    setMinute(parsed.minute)
+    setAmpm(parsed.ampm)
   }
 
-  function handleHourChange(h) {
-    setHour(h)
-    commit(h, minute, ampm)
+  function commit(nextHour, nextMinute, nextAmpm) {
+    let hour24 = nextHour % 12
+    if (nextAmpm === 'PM') hour24 += 12
+    onChange(`${String(hour24).padStart(2, '0')}:${String(nextMinute).padStart(2, '0')}`)
   }
 
-  function handleMinuteChange(m) {
-    setMinute(m)
-    commit(hour, m, ampm)
+  function handleHourChange(nextHour) {
+    setHour(nextHour)
+    commit(nextHour, minute, ampm)
   }
 
-  function handleAmpm(ap) {
-    setAmpm(ap)
-    commit(hour, minute, ap)
+  function handleMinuteChange(nextMinute) {
+    setMinute(nextMinute)
+    commit(hour, nextMinute, ampm)
+  }
+
+  function handleAmpm(nextAmpm) {
+    setAmpm(nextAmpm)
+    commit(hour, minute, nextAmpm)
   }
 
   const display = value
     ? (() => {
-        const [h, m] = value.split(':').map(Number)
-        const ap = h >= 12 ? 'PM' : 'AM'
-        const h12 = h % 12 === 0 ? 12 : h % 12
-        return `${h12}:${String(m).padStart(2, '0')} ${ap}`
+        const [hours, minutes] = value.split(':').map(Number)
+        const suffix = hours >= 12 ? 'PM' : 'AM'
+        const hour12 = hours % 12 === 0 ? 12 : hours % 12
+        return `${hour12}:${String(minutes).padStart(2, '0')} ${suffix}`
       })()
     : ''
 
   return (
-    <div ref={ref} style={{ position: 'relative' }}>
-      {label && (
-        <label style={{ fontSize: 13, color: 'gray', display: 'block', marginBottom: 4 }}>
-          {label}
-        </label>
-      )}
+    <div ref={ref} className="relative">
+      {label ? <p className="mb-1.5 text-sm font-medium text-slate-700">{label}</p> : null}
       <button
         type="button"
-        onClick={() => { setOpen(o => !o); setMode('hour') }}
-        style={{
-          width: '100%',
-          padding: '0.6rem 0.75rem',
-          borderRadius: 8,
-          border: '1px solid #e5e7eb',
-          fontSize: 14,
-          background: 'white',
-          textAlign: 'left',
-          cursor: 'pointer',
-          color: display ? '#0b2d3e' : '#9ca3af'
+        onClick={() => {
+          syncFromValue()
+          setOpen(current => !current)
+          setMode('hour')
         }}
+        className={cn(inputClassName, 'justify-between text-left', display ? 'text-slate-900' : 'text-slate-400')}
       >
         {display || 'Select time'}
       </button>
 
-      {open && (
-        <div style={{
-          position: 'absolute',
-          top: 'calc(100% + 8px)',
-          left: 0,
-          zIndex: 100,
-          background: 'white',
-          border: '1px solid #e5e7eb',
-          borderRadius: 12,
-          padding: '1rem',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.1)',
-          minWidth: 260
-        }}>
+      {open ? (
+        <div className="absolute left-0 top-[calc(100%+0.5rem)] z-30 min-w-[280px] rounded-3xl border border-slate-200 bg-white p-4 shadow-lg shadow-slate-200/80">
+          <div className="mb-3 flex items-center justify-center gap-1">
+            {['hour', 'minute'].map(currentMode => {
+              const isActive = mode === currentMode
+              const currentValue = currentMode === 'hour'
+                ? String(hour).padStart(2, '0')
+                : String(minute).padStart(2, '0')
 
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.25rem', marginBottom: '0.75rem' }}>
-            <button
-              type="button"
-              onClick={() => setMode('hour')}
-              style={{
-                padding: '6px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 22, fontWeight: 600,
-                background: mode === 'hour' ? '#0e7fa8' : '#f0f6fa',
-                color: mode === 'hour' ? 'white' : '#3d6272'
-              }}
-            >
-              {String(hour).padStart(2, '0')}
-            </button>
-            <span style={{ fontSize: 22, fontWeight: 600, color: '#0b2d3e' }}>:</span>
-            <button
-              type="button"
-              onClick={() => setMode('minute')}
-              style={{
-                padding: '6px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 22, fontWeight: 600,
-                background: mode === 'minute' ? '#0e7fa8' : '#f0f6fa',
-                color: mode === 'minute' ? 'white' : '#3d6272'
-              }}
-            >
-              {String(minute).padStart(2, '0')}
-            </button>
-            <div style={{ display: 'flex', flexDirection: 'column', borderRadius: 6, overflow: 'hidden', border: '1px solid #e5e7eb', marginLeft: 6 }}>
-              {['AM', 'PM'].map(ap => (
+              return (
                 <button
-                  key={ap}
+                  key={currentMode}
                   type="button"
-                  onClick={() => handleAmpm(ap)}
-                  style={{
-                    padding: '4px 10px', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 500,
-                    background: ampm === ap ? '#0e7fa8' : 'white',
-                    color: ampm === ap ? 'white' : '#3d6272'
-                  }}
+                  onClick={() => setMode(currentMode)}
+                  className={cn(
+                    'rounded-2xl px-4 py-2 text-2xl font-semibold tracking-tight transition-colors',
+                    isActive ? 'bg-primary-600 text-white' : 'bg-primary-50 text-primary-800'
+                  )}
                 >
-                  {ap}
+                  {currentValue}
+                </button>
+              )
+            })}
+
+            <span className="px-1 text-2xl font-semibold text-slate-900">:</span>
+
+            <div className="ml-2 overflow-hidden rounded-2xl border border-slate-200">
+              {['AM', 'PM'].map(option => (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => handleAmpm(option)}
+                  className={cn(
+                    'block w-full px-3 py-1.5 text-xs font-semibold transition-colors',
+                    ampm === option ? 'bg-primary-600 text-white' : 'bg-white text-slate-500 hover:bg-slate-50'
+                  )}
+                >
+                  {option}
                 </button>
               ))}
             </div>
           </div>
 
-          <p style={{ textAlign: 'center', fontSize: 12, color: 'gray', marginBottom: '0.5rem' }}>
+          <p className="mb-3 text-center text-xs text-slate-400">
             {mode === 'hour' ? 'Drag or tap to select hour' : 'Drag or tap to select minute'}
           </p>
 
-          <div style={{ display: 'flex', justifyContent: 'center' }}>
+          <div className="flex justify-center">
             <ClockFace
               mode={mode}
               value={mode === 'hour' ? hour : minute}
@@ -263,16 +267,12 @@ export default function TimePicker({ value, onChange, label }) {
           <button
             type="button"
             onClick={() => setOpen(false)}
-            style={{
-              width: '100%', marginTop: '0.75rem', padding: '0.6rem',
-              background: '#0e7fa8', color: 'white', border: 'none',
-              borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 500
-            }}
+            className="mt-3 w-full rounded-2xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-700"
           >
             Done
           </button>
         </div>
-      )}
+      ) : null}
     </div>
   )
 }

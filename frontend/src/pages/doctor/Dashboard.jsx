@@ -1,39 +1,41 @@
-import PageLayout from '../../components/layout/PageLayout'
-import LoadingSpinner from '../../components/ui/LoadingSpinner'
-import ErrorMessage from '../../components/ui/ErrorMessage'
-import { useFetch } from '../../hooks/useFetch'
-import { supabase } from '../../lib/supabase'
-import { useAuth } from '../../hooks/useAuth'
+import { CalendarDays, ClipboardList, UserRound } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import PageLayout from '../../components/layout/PageLayout'
+import Button from '../../components/ui/Button'
+import Card from '../../components/ui/Card'
+import EmptyState from '../../components/ui/EmptyState'
+import ErrorMessage from '../../components/ui/ErrorMessage'
+import LoadingSpinner from '../../components/ui/LoadingSpinner'
+import SectionHeader from '../../components/ui/SectionHeader'
+import { useFetch } from '../../hooks/useFetch'
+import { useAuth } from '../../hooks/useAuth'
+import { getAge } from '../../lib/formatters'
+import { supabase } from '../../lib/supabase'
 
-function getAge(dob) {
-  if (!dob) return '—'
-  const diff = Date.now() - new Date(dob).getTime()
-  return Math.floor(diff / (1000 * 60 * 60 * 24 * 365.25))
-}
-
-function getProfile(profiles) {
-  if (!profiles) return {}
-  return Array.isArray(profiles) ? profiles[0] : profiles
+function getProfile(value) {
+  if (!value) return {}
+  return Array.isArray(value) ? value[0] : value
 }
 
 export default function DoctorDashboard() {
   const { user, profile } = useAuth()
 
   const { data, loading, error, refetch } = useFetch(async () => {
-    if (!user) return null
+    if (!user?.id) return []
+
     const start = new Date()
     start.setHours(0, 0, 0, 0)
     const end = new Date()
     end.setHours(23, 59, 59, 999)
 
-    const { data: appts, error: err } = await supabase
+    const { data: appointments, error: fetchError } = await supabase
       .from('appointments')
       .select(`
         id,
         scheduled_at,
         status,
         patients (
+          id,
           dob,
           profiles (full_name, gender)
         )
@@ -44,106 +46,129 @@ export default function DoctorDashboard() {
       .lte('scheduled_at', end.toISOString())
       .order('scheduled_at', { ascending: true })
 
-    if (err) throw err
-    return appts
-  }, [user?.id])
+    if (fetchError) throw fetchError
+    return appointments || []
+  }, [user?.id], { key: `doctor-dashboard:${user?.id ?? 'anonymous'}` })
 
-  const today = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+  const today = new Date().toLocaleDateString('en-IN', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  })
 
   return (
-    <PageLayout>
-      <div style={{ marginBottom: '2rem' }}>
-        <h1 style={{ marginBottom: '0.25rem' }}>Good morning, Dr. {profile?.full_name}</h1>
-        <p style={{ color: 'gray', fontSize: 14 }}>{today}</p>
-      </div>
-
-      <div style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <h2 style={{ fontSize: 18, fontWeight: 600 }}>Today's Appointments</h2>
-        <Link to="/doctor/appointments" style={{ fontSize: 14, color: '#0369a1', textDecoration: 'none' }}>
-          View all →
-        </Link>
-      </div>
-
-      {!user || loading ? (
-        <LoadingSpinner />
-      ) : error ? (
-        <ErrorMessage message={error} onRetry={refetch} />
-      ) : !data || data.length === 0 ? (
-        <div style={{
-          padding: '2rem', textAlign: 'center', background: '#f9fafb',
-          borderRadius: 10, border: '1px dashed #d1d5db', color: 'gray'
-        }}>
-          No scheduled appointments for today.
-        </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          {data.map(appt => {
-            const patientProfile = getProfile(appt.patients?.profiles)
-            const dob = appt.patients?.dob
-            const age = getAge(dob)
-            const gender = patientProfile?.gender
-              ? patientProfile.gender.charAt(0).toUpperCase() + patientProfile.gender.slice(1)
-              : '—'
-            const time = new Date(appt.scheduled_at).toLocaleTimeString('en-IN', {
-              hour: '2-digit', minute: '2-digit', hour12: true
-            })
-
-            return (
-              <div key={appt.id} style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '1rem 1.25rem', borderRadius: 10,
-                border: '1px solid #e5e7eb', background: 'white', gap: '1rem',
-                flexWrap: 'wrap'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                  <div style={{
-                    width: 44, height: 44, borderRadius: '50%',
-                    background: '#e0f2fe', display: 'flex', alignItems: 'center',
-                    justifyContent: 'center', fontWeight: 600, fontSize: 16, color: '#0369a1',
-                    flexShrink: 0
-                  }}>
-                    {patientProfile?.full_name?.charAt(0) ?? '?'}
-                  </div>
-                  <div>
-                    <p style={{ fontWeight: 600, marginBottom: 2 }}>
-                      {patientProfile?.full_name ?? 'Unknown Patient'}
-                    </p>
-                    <p style={{ fontSize: 13, color: 'gray' }}>
-                      {gender} · {age !== '—' ? `${age} yrs` : '—'}
-                    </p>
-                  </div>
-                </div>
-
-                <div style={{ textAlign: 'center' }}>
-                  <p style={{ fontSize: 13, color: 'gray', marginBottom: 2 }}>Time</p>
-                  <p style={{ fontWeight: 600, fontSize: 15 }}>{time}</p>
-                </div>
-
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <Link
-                    to={`/doctor/appointments/${appt.id}`}
-                    style={{
-                      padding: '0.5rem 1rem', borderRadius: 8, fontSize: 13,
-                      background: '#0369a1', color: 'white', textDecoration: 'none', fontWeight: 500
-                    }}
-                  >
-                    View appointment
-                  </Link>
-                  <Link
-                    to={`/doctor/patients/${appt.patients?.id ?? ''}`}
-                    style={{
-                      padding: '0.5rem 1rem', borderRadius: 8, fontSize: 13,
-                      border: '1px solid #e5e7eb', color: '#374151', textDecoration: 'none', fontWeight: 500
-                    }}
-                  >
-                    Patient records
-                  </Link>
-                </div>
-              </div>
-            )
-          })}
-        </div>
+    <PageLayout
+      width="wide"
+      actions={(
+        <Button as={Link} to="/doctor/availability">
+          <CalendarDays className="h-4 w-4" />
+          Manage availability
+        </Button>
       )}
+    >
+      <div className="space-y-6">
+        <Card tone="brand">
+          <div className="grid gap-6 lg:grid-cols-[1.5fr_0.8fr]">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary-50/70">
+                Today
+              </p>
+              <h2 className="mt-3 font-display text-4xl font-semibold tracking-tight text-white">
+                Good morning, Dr. {profile?.full_name ?? 'Doctor'}
+              </h2>
+              <p className="mt-3 text-base leading-relaxed text-primary-50/80">
+                Stay focused on today’s confirmed visits, open each appointment quickly, and jump into patient history when needed.
+              </p>
+            </div>
+
+            <div className="rounded-[28px] border border-white/10 bg-white/10 p-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary-50/70">
+                Daily overview
+              </p>
+              <p className="mt-3 text-lg font-semibold text-white">{today}</p>
+              <p className="mt-4 text-sm leading-relaxed text-primary-50/70">
+                Scheduled appointments for today: <span className="font-semibold text-white">{data?.length ?? 0}</span>
+              </p>
+            </div>
+          </div>
+        </Card>
+
+        <SectionHeader
+          eyebrow="Today’s schedule"
+          title="Confirmed appointments"
+          description="Appointments are shown in chronological order so you can move through the day’s clinical work without losing context."
+          actions={(
+            <Button as={Link} to="/doctor/appointments" variant="secondary">
+              <ClipboardList className="h-4 w-4" />
+              View all appointments
+            </Button>
+          )}
+        />
+
+        {loading ? <LoadingSpinner message="Loading today's appointments..." /> : null}
+        {error ? <ErrorMessage message={error} onRetry={refetch} /> : null}
+
+        {loading || error ? null : data.length === 0 ? (
+          <EmptyState
+            icon={<CalendarDays className="h-5 w-5" />}
+            title="No scheduled appointments for today"
+            description="When patients book into an available slot, today’s confirmed appointments will appear here."
+            action={(
+              <Button as={Link} to="/doctor/availability">
+                Manage availability
+              </Button>
+            )}
+          />
+        ) : (
+          <div className="grid gap-4">
+            {data.map(appointment => {
+              const patient = getProfile(appointment.patients)
+              const patientProfile = getProfile(patient?.profiles)
+              const age = getAge(patient?.dob)
+              const appointmentTime = new Date(appointment.scheduled_at).toLocaleTimeString('en-IN', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true,
+              })
+
+              return (
+                <Card key={appointment.id}>
+                  <div className="grid gap-4 lg:grid-cols-[1.1fr_0.7fr_auto] lg:items-center">
+                    <div className="flex items-center gap-4">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-50 text-primary-700">
+                        <UserRound className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-lg font-semibold text-slate-900">
+                          {patientProfile?.full_name ?? 'Unknown patient'}
+                        </p>
+                        <p className="mt-1 text-sm text-slate-500">
+                          {(patientProfile?.gender ? `${patientProfile.gender} • ` : '') + (age !== null ? `${age} yrs` : 'Age not available')}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1 text-sm text-slate-500">
+                      <p className="font-semibold text-slate-900">{appointmentTime}</p>
+                      <p>Scheduled today</p>
+                    </div>
+
+                    <div className="flex flex-wrap gap-3 lg:justify-end">
+                      <Button as={Link} to={`/doctor/appointments/${appointment.id}`}>
+                        View appointment
+                      </Button>
+                      <Button as={Link} to={`/doctor/patients/${patient?.id ?? ''}`} variant="secondary">
+                        Patient history
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+              )
+            })}
+          </div>
+        )}
+      </div>
     </PageLayout>
   )
 }

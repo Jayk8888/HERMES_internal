@@ -1,18 +1,21 @@
-import { useNavigate } from 'react-router-dom'
+import { CalendarPlus2 } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import PageLayout from '../../components/layout/PageLayout'
-import LoadingSpinner from '../../components/ui/LoadingSpinner'
+import Button from '../../components/ui/Button'
+import Card from '../../components/ui/Card'
+import EmptyState from '../../components/ui/EmptyState'
 import ErrorMessage from '../../components/ui/ErrorMessage'
+import LoadingSpinner from '../../components/ui/LoadingSpinner'
+import SectionHeader from '../../components/ui/SectionHeader'
+import StatusBadge from '../../components/ui/StatusBadge'
 import { useFetch } from '../../hooks/useFetch'
+import { useAuth } from '../../hooks/useAuth'
+import { getProfileName, pickFirst } from '../../lib/data'
+import { formatDateTime } from '../../lib/formatters'
 import { supabase } from '../../lib/supabase'
 
-function statusColor(status) {
-  if (status === 'scheduled') return { background: '#e0f2fe', color: '#0369a1' }
-  if (status === 'completed') return { background: '#dcfce7', color: '#15803d' }
-  if (status === 'cancelled') return { background: '#fee2e2', color: '#b91c1c' }
-}
-
 export default function PatientAppointments() {
-  const navigate = useNavigate()
+  const { user } = useAuth()
 
   const { data, loading, error, refetch } = useFetch(() =>
     supabase
@@ -23,68 +26,92 @@ export default function PatientAppointments() {
         status,
         doctor:doctor_id (
           id,
+          specialization,
           profiles (full_name, email)
         )
       `)
       .order('scheduled_at', { ascending: false })
-      .then(r => {
-        if (r.error) throw r.error
-        return r.data
+      .then(response => {
+        if (response.error) throw response.error
+        return response.data
       })
-  )
+  , [user?.id], { key: `patient-appointments:${user?.id ?? 'anonymous'}` })
 
   return (
-    <PageLayout>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-        <h1>My Appointments</h1>
-        <button onClick={() => navigate('/patient/appointments/book')}>
-          + Book appointment
-        </button>
-      </div>
-
-      {loading && <LoadingSpinner />}
-      {error && <ErrorMessage message={error} onRetry={refetch} />}
-
-      {data && data.length === 0 && (
-        <p style={{ color: 'gray' }}>No appointments yet. Book one to get started.</p>
+    <PageLayout
+      width="wide"
+      actions={(
+        <Button as={Link} to="/patient/appointments/book">
+          <CalendarPlus2 className="h-4 w-4" />
+          Book appointment
+        </Button>
       )}
+    >
+      <div className="space-y-6">
+        <SectionHeader
+          title="My appointments"
+          description="Review scheduled, completed, and cancelled visits with direct access to each detail page."
+          actions={(
+            <Button as={Link} to="/patient/appointments/book">
+              <CalendarPlus2 className="h-4 w-4" />
+              Book appointment
+            </Button>
+          )}
+        />
 
-      {data && data.map(appt => (
-        <div
-          key={appt.id}
-          onClick={() => navigate(`/patient/appointments/${appt.id}`)}
-          style={{
-            padding: '1rem 1.25rem',
-            borderRadius: 10,
-            border: '1px solid #e5e7eb',
-            marginBottom: '0.75rem',
-            cursor: 'pointer',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            background: 'white'
-          }}
-        >
-          <div>
-            <p style={{ fontWeight: 500, marginBottom: 4 }}>
-              Dr. {appt.doctor?.profiles?.full_name ?? 'Unknown'}
-            </p>
-            <p style={{ fontSize: 14, color: 'gray' }}>
-              {new Date(appt.scheduled_at).toLocaleString()}
-            </p>
-          </div>
-          <span style={{
-            fontSize: 12,
-            fontWeight: 500,
-            padding: '4px 10px',
-            borderRadius: 20,
-            textTransform: 'capitalize',
-            ...statusColor(appt.status)
-          }}>
-            {appt.status}
-          </span>
-        </div>
-      ))}
+        {loading ? <LoadingSpinner message="Loading appointments..." /> : null}
+        {error ? <ErrorMessage message={error} onRetry={refetch} /> : null}
+
+        {!loading && !error && data?.length === 0 ? (
+          <EmptyState
+            icon="A"
+            title="No appointments yet"
+            description="Once you book a visit, you will see the full appointment timeline here."
+            action={(
+              <Button as={Link} to="/patient/appointments/book">
+                Book an appointment
+              </Button>
+            )}
+          />
+        ) : null}
+
+        {!loading && !error && data?.length > 0 ? (
+          <Card className="divide-y divide-slate-200/80 overflow-hidden p-0">
+            {data.map(appointment => {
+              const doctor = pickFirst(appointment.doctor)
+              const doctorProfile = pickFirst(doctor?.profiles)
+
+              return (
+                <Link
+                  key={appointment.id}
+                  to={`/patient/appointments/${appointment.id}`}
+                  className="block px-5 py-5 no-underline transition-colors hover:bg-slate-50/75 sm:px-6"
+                >
+                  <div className="grid gap-4 md:grid-cols-[1.4fr_0.9fr_auto] md:items-center">
+                    <div>
+                      <h3 className="text-lg font-semibold text-slate-900">
+                        Dr. {getProfileName(doctorProfile)}
+                      </h3>
+                      <p className="mt-1 text-sm text-slate-500">
+                        {doctor?.specialization || 'Specialization not available'}
+                      </p>
+                    </div>
+
+                    <div className="space-y-1 text-sm text-slate-500">
+                      <p>{formatDateTime(appointment.scheduled_at)}</p>
+                      <p>{doctorProfile?.email || 'No email available'}</p>
+                    </div>
+
+                    <div className="md:justify-self-end">
+                      <StatusBadge status={appointment.status} />
+                    </div>
+                  </div>
+                </Link>
+              )
+            })}
+          </Card>
+        ) : null}
+      </div>
     </PageLayout>
   )
 }

@@ -1,32 +1,19 @@
-import PageLayout from '../../components/layout/PageLayout'
-import LoadingSpinner from '../../components/ui/LoadingSpinner'
-import ErrorMessage from '../../components/ui/ErrorMessage'
-import { useFetch } from '../../hooks/useFetch'
-import { supabase } from '../../lib/supabase'
+import { CalendarPlus2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import PageLayout from '../../components/layout/PageLayout'
+import Button from '../../components/ui/Button'
+import Card from '../../components/ui/Card'
+import EmptyState from '../../components/ui/EmptyState'
+import ErrorMessage from '../../components/ui/ErrorMessage'
+import LoadingSpinner from '../../components/ui/LoadingSpinner'
+import SectionHeader from '../../components/ui/SectionHeader'
+import StatusBadge from '../../components/ui/StatusBadge'
+import { useFetch } from '../../hooks/useFetch'
 import { useAuth } from '../../hooks/useAuth.jsx'
-
-function formatDate(value) {
-  if (!value) return 'Not available'
-
-  return new Intl.DateTimeFormat('en-IN', {
-    dateStyle: 'medium',
-    timeStyle: 'short'
-  }).format(new Date(value))
-}
-
-function summariseVitals(vitals) {
-  if (!vitals || typeof vitals !== 'object') return 'No vitals recorded'
-
-  const entries = Object.entries(vitals).slice(0, 3)
-  if (!entries.length) return 'No vitals recorded'
-
-  return entries.map(([key, value]) => `${key}: ${value}`).join(' | ')
-}
-
-function pickFirst(value) {
-  return Array.isArray(value) ? value[0] : value
-}
+import { pickFirst } from '../../lib/data'
+import { formatDateTime } from '../../lib/formatters'
+import { summariseVitals } from '../../lib/medical'
+import { supabase } from '../../lib/supabase'
 
 export default function PatientRecords() {
   const { user, loading: authLoading } = useAuth()
@@ -47,128 +34,109 @@ export default function PatientRecords() {
               scheduled_at,
               status,
               doctor:doctors!appointments_doctor_id_fkey(
-                specialization
+                specialization,
+                profiles (full_name)
               )
             )
           `)
           .order('created_at', { ascending: false })
-          .then(async r => {
-            if (r.error) throw r.error
-
-            const records = r.data ?? []
-            const doctorIds = [
-              ...new Set(
-                records
-                  .map(record => pickFirst(record.appointment)?.doctor_id)
-                  .filter(Boolean)
-              )
-            ]
-
-            if (!doctorIds.length) return records
-
-            const { data: profiles, error: profilesError } = await supabase
-              .from('profiles')
-              .select('id, full_name')
-              .in('id', doctorIds)
-
-            if (profilesError) throw profilesError
-
-            const namesById = Object.fromEntries(
-              (profiles ?? []).map(profile => [profile.id, profile.full_name])
-            )
-
-            return records.map(record => {
-              const appointment = pickFirst(record.appointment)
-
-              return {
-                ...record,
-                doctorName: namesById[appointment?.doctor_id] ?? null
-              }
-            })
+          .then(response => {
+            if (response.error) throw response.error
+            return response.data ?? []
           })
       : Promise.resolve([])
-  , [user?.id])
+  , [user?.id], { key: `patient-records:${user?.id ?? 'anonymous'}` })
 
   if (authLoading) {
     return (
       <PageLayout>
-        <h1>Patient Records</h1>
-        <LoadingSpinner />
+        <LoadingSpinner message="Loading your records..." />
       </PageLayout>
     )
   }
 
   return (
-    <PageLayout>
-      <h1>Patient Records</h1>
-      {loading && <LoadingSpinner />}
-      {error && <ErrorMessage message={error} onRetry={refetch} />}
-      {!loading && !error && data?.length === 0 && (
-        <p>No medical records are available yet.</p>
+    <PageLayout
+      width="wide"
+      actions={(
+        <Button as={Link} to="/patient/appointments/book">
+          <CalendarPlus2 className="h-4 w-4" />
+          Book appointment
+        </Button>
       )}
-      {!loading && !error && data?.length > 0 && (
-        <div style={{ display: 'grid', gap: '1rem', textAlign: 'left' }}>
-          {data.map(record => {
-            const appointment = pickFirst(record.appointment)
-            const doctor = pickFirst(appointment?.doctor)
+    >
+      <div className="space-y-6">
+        <SectionHeader
+          title="Medical records"
+          description="Review appointment-linked clinical notes, prescriptions, and recorded vitals."
+          actions={(
+            <Button as={Link} to="/patient/appointments/book" variant="secondary">
+              <CalendarPlus2 className="h-4 w-4" />
+              Book appointment
+            </Button>
+          )}
+        />
 
-            return (
-              <article
-                key={record.id}
-                style={{
-                  border: '1px solid #e5e7eb',
-                  borderRadius: 16,
-                  padding: '1rem 1.25rem',
-                  background: 'rgba(255,255,255,0.7)'
-                }}
-              >
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'flex-start',
-                  gap: '1rem',
-                  marginBottom: '0.75rem',
-                  flexWrap: 'wrap'
-                }}>
-                  <div>
-                    <h2 style={{ marginBottom: 4 }}>
-                      {record.doctorName ?? 'Doctor'}
-                    </h2>
-                    <p style={{ color: '#6b7280' }}>
-                      {doctor?.specialization ?? 'Specialization not available'}
-                    </p>
+        {loading ? <LoadingSpinner message="Loading your records..." /> : null}
+        {error ? <ErrorMessage message={error} onRetry={refetch} /> : null}
+
+        {!loading && !error && data?.length === 0 ? (
+          <EmptyState
+            icon="R"
+            title="No medical records yet"
+            description="Records will appear here after a doctor completes an appointment and adds clinical notes."
+            action={(
+              <Button as={Link} to="/patient/appointments">
+                View appointments
+              </Button>
+            )}
+          />
+        ) : null}
+
+        {!loading && !error && data?.length > 0 ? (
+          <Card className="divide-y divide-slate-200/80 overflow-hidden p-0">
+            {data.map(record => {
+              const appointment = pickFirst(record.appointment)
+              const doctor = pickFirst(appointment?.doctor)
+              const doctorProfile = pickFirst(doctor?.profiles)
+
+              return (
+                <Link
+                  key={record.id}
+                  to={`/patient/records/${record.id}`}
+                  className="block px-5 py-5 no-underline transition-colors hover:bg-slate-50/75 sm:px-6"
+                >
+                  <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr_auto] lg:items-center">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                        Doctor
+                      </p>
+                      <h3 className="mt-2 text-lg font-semibold text-slate-900">
+                        Dr. {doctorProfile?.full_name || 'Doctor'}
+                      </h3>
+                      <p className="mt-1 text-sm text-slate-500">
+                        {doctor?.specialization || 'Specialization not available'}
+                      </p>
+                      <p className="mt-3 text-sm leading-relaxed text-slate-600">
+                        {record.description}
+                      </p>
+                    </div>
+
+                    <div className="space-y-2 text-sm text-slate-500">
+                      <p>Recorded {formatDateTime(record.created_at)}</p>
+                      <p>{summariseVitals(record.vitals)}</p>
+                    </div>
+
+                    <div className="lg:justify-self-end">
+                      <StatusBadge status={appointment?.status} />
+                    </div>
                   </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <p style={{ fontSize: 14, color: '#6b7280' }}>Recorded</p>
-                    <p>{formatDate(record.created_at)}</p>
-                  </div>
-                </div>
-
-                <p style={{ marginBottom: '0.75rem', color: '#111827' }}>
-                  {record.description}
-                </p>
-
-                <div style={{ display: 'grid', gap: '0.35rem', marginBottom: '1rem' }}>
-                  <p>
-                    <strong>Appointment:</strong> {formatDate(appointment?.scheduled_at)}
-                  </p>
-                  <p>
-                    <strong>Status:</strong> {appointment?.status ?? 'Unknown'}
-                  </p>
-                  <p>
-                    <strong>Prescription:</strong> {record.prescription || 'No prescription recorded'}
-                  </p>
-                  <p>
-                    <strong>Vitals:</strong> {summariseVitals(record.vitals)}
-                  </p>
-                </div>
-
-                <Link to={`/patient/records/${record.id}`}>View full record</Link>
-              </article>
-            )
-          })}
-        </div>
-      )}
+                </Link>
+              )
+            })}
+          </Card>
+        ) : null}
+      </div>
     </PageLayout>
   )
 }

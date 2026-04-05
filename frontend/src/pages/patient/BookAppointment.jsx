@@ -222,24 +222,25 @@ export default function PatientBookAppointment() {
       const appointmentDate = new Date(selectedDate)
       appointmentDate.setHours(Number(startHour), Number(startMinute), 0, 0)
 
-      const { data, error: insertError } = await supabase
-        .from('appointments')
-        .insert([{
-          patient_id: user.id,
-          doctor_id: selectedDoctor,
-          scheduled_at: appointmentDate.toISOString(),
-          status: 'scheduled',
-        }])
-        .select()
+      const { data, error: bookingRpcError } = await supabase
+        .rpc('book_appointment', {
+          p_doctor_id: selectedDoctor,
+          p_scheduled_at: appointmentDate.toISOString(),
+        })
 
-      if (insertError) throw insertError
+      if (bookingRpcError) throw bookingRpcError
 
-      setBookedAppointment(data?.[0] ?? null)
+      setBookedAppointment(data ?? null)
       setSelectedDoctor(null)
       setSelectedDate('')
       setSelectedSlot(null)
     } catch (requestError) {
-      setBookingError(requestError.message || 'Failed to book appointment')
+      const message = requestError.message || 'Failed to book appointment'
+      setBookingError(
+        message.includes('row-level security policy')
+          ? 'Your account is not allowed to book appointments yet. Complete your patient profile and sign in again.'
+          : message
+      )
     } finally {
       setIsBooking(false)
     }

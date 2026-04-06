@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState, useEffect } from 'react'
 
 export function useFetch(fn, deps = []) {
   const [data, setData] = useState(null)
@@ -11,17 +11,14 @@ export function useFetch(fn, deps = []) {
     try {
       const result = await fn()
       setData(result)
-    } catch (error) {
-      setError(error.message)
+    } catch (e) {
+      setError(e.message)
     } finally {
       setLoading(false)
     }
   }
 
-  useEffect(() => {
-    void fetch()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps)
+  useEffect(() => { fetch() }, deps)
 
   return { data, loading, error, refetch: fetch }
 }

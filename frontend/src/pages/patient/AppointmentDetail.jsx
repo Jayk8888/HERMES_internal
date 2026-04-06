@@ -1,24 +1,16 @@
-import { ArrowLeft } from 'lucide-react'
-import { useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import PageLayout from '../../components/layout/PageLayout'
-import Button from '../../components/ui/Button'
-import Card from '../../components/ui/Card'
-import ErrorMessage from '../../components/ui/ErrorMessage'
-import InfoList from '../../components/ui/InfoList'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
-import StatusBadge from '../../components/ui/StatusBadge'
+import ErrorMessage from '../../components/ui/ErrorMessage'
 import { useFetch } from '../../hooks/useFetch'
-import { useAuth } from '../../hooks/useAuth'
-import { getProfileName, pickFirst } from '../../lib/data'
-import { formatDateTime } from '../../lib/formatters'
 import { supabase } from '../../lib/supabase'
+import { useState } from 'react'
 
 export default function PatientAppointmentDetail() {
   const { id } = useParams()
-  const { user } = useAuth()
+  const navigate = useNavigate()
   const [cancelling, setCancelling] = useState(false)
-  const [cancelError, setCancelError] = useState('')
+  const [cancelError, setCancelError] = useState(null)
 
   const { data, loading, error, refetch } = useFetch(() =>
     supabase
@@ -36,98 +28,91 @@ export default function PatientAppointmentDetail() {
       `)
       .eq('id', id)
       .single()
-      .then(response => {
-        if (response.error) throw response.error
-        return response.data
+      .then(r => {
+        if (r.error) throw r.error
+        return r.data
       })
-  , [id, user?.id], { key: `patient-appointment-detail:${user?.id ?? 'anonymous'}:${id ?? 'unknown'}` })
+  , [id])
 
   async function handleCancel() {
-    setCancelError('')
+    setCancelError(null)
     setCancelling(true)
-
     try {
-      const { error: updateError } = await supabase
-        .from('appointments')
-        .update({ status: 'cancelled' })
-        .eq('id', id)
-
-      if (updateError) throw updateError
-      await refetch()
-    } catch (requestError) {
-      setCancelError(requestError.message)
+      const { error } = await supabase.rpc('update_appointment_status', {
+        appointment_id: id,
+        new_status: 'cancelled'
+      })
+      if (error) throw error
+      refetch()
+    } catch (err) {
+      setCancelError(err.message)
     } finally {
       setCancelling(false)
     }
   }
 
-  const doctor = pickFirst(data?.doctor)
-  const doctorProfile = pickFirst(doctor?.profiles)
-
   return (
-    <PageLayout width="narrow">
-      <div className="space-y-5">
-        <Link
-          to="/patient/appointments"
-          className="inline-flex items-center gap-2 text-sm font-semibold text-primary-700 no-underline hover:text-primary-800"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to appointments
-        </Link>
+    <PageLayout>
+      <button
+        onClick={() => navigate('/patient/appointments')}
+        style={{ marginBottom: '1.5rem', background: 'none', border: 'none', cursor: 'pointer', color: 'gray', padding: 0 }}
+      >
+        ← Back to appointments
+      </button>
 
-        {loading ? <LoadingSpinner message="Loading appointment details..." /> : null}
-        {error ? <ErrorMessage message={error} onRetry={refetch} /> : null}
+      {loading && <LoadingSpinner />}
+      {error && <ErrorMessage message={error} onRetry={refetch} />}
 
-        {data ? (
-          <>
-            <Card tone="brand">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary-50/70">
-                    Appointment detail
-                  </p>
-                  <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-white">
-                    {formatDateTime(data.scheduled_at)}
-                  </h2>
-                  <p className="mt-3 max-w-2xl text-base leading-relaxed text-primary-50/80">
-                    Review the doctor, schedule, and current status for this visit.
-                  </p>
-                </div>
-                <StatusBadge status={data.status} />
-              </div>
-            </Card>
+      {data && (
+        <div style={{ maxWidth: 560 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+            <h1>Appointment Details</h1>
+            <span style={{
+              fontSize: 13,
+              fontWeight: 500,
+              padding: '4px 12px',
+              borderRadius: 20,
+              textTransform: 'capitalize',
+              background: data.status === 'scheduled' ? '#e0f2fe' : data.status === 'completed' ? '#dcfce7' : '#fee2e2',
+              color: data.status === 'scheduled' ? '#0369a1' : data.status === 'completed' ? '#15803d' : '#b91c1c'
+            }}>
+              {data.status}
+            </span>
+          </div>
 
-            <Card className="space-y-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                  Doctor information
-                </p>
-                <h3 className="mt-2 text-xl font-semibold text-slate-900">
-                  Dr. {getProfileName(doctorProfile)}
-                </h3>
-              </div>
-              <InfoList
-                items={[
-                  { label: 'Specialization', value: doctor?.specialization || 'Not available' },
-                  { label: 'License number', value: doctor?.license_no || 'Not available' },
-                  { label: 'Email', value: doctorProfile?.email || 'Not available' },
-                  { label: 'Scheduled for', value: formatDateTime(data.scheduled_at) },
-                ]}
-              />
-            </Card>
+          <div style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: 10, padding: '1.25rem', marginBottom: '1rem' }}>
+            <p style={{ fontSize: 13, color: 'gray', marginBottom: 4 }}>Doctor</p>
+            <p style={{ fontWeight: 500, marginBottom: 2 }}>Dr. {data.doctor?.profiles?.full_name}</p>
+            <p style={{ fontSize: 14, color: 'gray' }}>{data.doctor?.specialization}</p>
+            <p style={{ fontSize: 13, color: 'gray', marginTop: 2 }}>License: {data.doctor?.license_no}</p>
+          </div>
 
-            {cancelError ? <ErrorMessage message={cancelError} /> : null}
+          <div style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: 10, padding: '1.25rem', marginBottom: '1.5rem' }}>
+            <p style={{ fontSize: 13, color: 'gray', marginBottom: 4 }}>Scheduled at</p>
+            <p style={{ fontWeight: 500 }}>{new Date(data.scheduled_at).toLocaleString()}</p>
+          </div>
 
-            {data.status === 'scheduled' ? (
-              <div className="flex justify-end">
-                <Button variant="danger" onClick={handleCancel} loading={cancelling}>
-                  {cancelling ? 'Cancelling...' : 'Cancel appointment'}
-                </Button>
-              </div>
-            ) : null}
-          </>
-        ) : null}
-      </div>
+          {cancelError && <ErrorMessage message={cancelError} />}
+
+          {data.status === 'scheduled' && (
+            <button
+              onClick={handleCancel}
+              disabled={cancelling}
+              style={{
+                padding: '0.7rem 1.5rem',
+                background: '#fee2e2',
+                color: '#b91c1c',
+                border: '1px solid #fecaca',
+                borderRadius: 8,
+                cursor: 'pointer',
+                fontWeight: 500
+              }}
+            >
+              {cancelling ? 'Cancelling...' : 'Cancel appointment'}
+            </button>
+          )}
+        </div>
+      )}
     </PageLayout>
   )
 }

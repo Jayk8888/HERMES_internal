@@ -1,20 +1,22 @@
 import { useState } from 'react'
-import { CalendarDays, Clock3 } from 'lucide-react'
 import PageLayout from '../../components/layout/PageLayout'
-import Button from '../../components/ui/Button'
-import Card from '../../components/ui/Card'
-import EmptyState from '../../components/ui/EmptyState'
-import ErrorMessage from '../../components/ui/ErrorMessage'
-import Field from '../../components/ui/Field'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
-import SectionHeader from '../../components/ui/SectionHeader'
-import Select from '../../components/ui/Select'
-import TimePicker from '../../components/ui/TimePicker'
+import ErrorMessage from '../../components/ui/ErrorMessage'
 import { useFetch } from '../../hooks/useFetch'
-import { useAuth } from '../../hooks/useAuth.jsx'
-import { WEEK_DAYS } from '../../lib/constants'
-import { formatTime } from '../../lib/formatters'
 import { supabase } from '../../lib/supabase'
+import TimePicker from '../../components/ui/TimePicker'
+import { useAuth } from '../../hooks/useAuth.jsx'
+
+const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+
+function formatTime(time) {
+  if (!time) return ''
+  const [h, m] = time.split(':')
+  const hour = parseInt(h)
+  const ampm = hour >= 12 ? 'PM' : 'AM'
+  const display = hour % 12 === 0 ? 12 : hour % 12
+  return `${display}:${m} ${ampm}`
+}
 
 export default function DoctorAvailability() {
   const { user } = useAuth()
@@ -22,7 +24,7 @@ export default function DoctorAvailability() {
   const [startTime, setStartTime] = useState('')
   const [endTime, setEndTime] = useState('')
   const [adding, setAdding] = useState(false)
-  const [addError, setAddError] = useState('')
+  const [addError, setAddError] = useState(null)
   const [deletingId, setDeletingId] = useState(null)
 
   const { data, loading, error, refetch } = useFetch(() =>
@@ -32,16 +34,16 @@ export default function DoctorAvailability() {
           .select('id, day, start_time, end_time')
           .eq('doctor_id', user.id)
           .order('start_time', { ascending: true })
-          .then(response => {
-            if (response.error) throw response.error
-            return response.data
+          .then(r => {
+            if (r.error) throw r.error
+            return r.data
           })
       : Promise.resolve([])
-  , [user?.id], { key: `doctor-availability:${user?.id ?? 'anonymous'}` })
+  , [user?.id])
 
-  async function handleAdd(event) {
-    event.preventDefault()
-    setAddError('')
+  async function handleAdd(e) {
+    e.preventDefault()
+    setAddError(null)
 
     const overlaps = (data ?? []).some(slot => {
       if (slot.day !== day) return false
@@ -49,28 +51,26 @@ export default function DoctorAvailability() {
     })
 
     if (overlaps) {
-      setAddError('This slot overlaps with an existing one.')
+      setAddError("This slot overlaps with an existing one")
       return
     }
 
     if (endTime <= startTime) {
-      setAddError('End time must be after start time.')
+      setAddError('End time must be after start time')
       return
     }
 
     setAdding(true)
-
     try {
-      const { error: insertError } = await supabase
+      const { error } = await supabase
         .from('availability')
         .insert({ doctor_id: user.id, day, start_time: startTime, end_time: endTime })
-
-      if (insertError) throw insertError
+      if (error) throw error
       setStartTime('')
       setEndTime('')
-      await refetch()
-    } catch (requestError) {
-      setAddError(requestError.message)
+      refetch()
+    } catch (err) {
+      setAddError(err.message)
     } finally {
       setAdding(false)
     }
@@ -78,127 +78,120 @@ export default function DoctorAvailability() {
 
   async function handleDelete(id) {
     setDeletingId(id)
-
     try {
-      const { error: deleteError } = await supabase
+      const { error } = await supabase
         .from('availability')
         .delete()
         .eq('id', id)
-
-      if (deleteError) throw deleteError
-      await refetch()
-    } catch (requestError) {
-      setAddError(requestError.message)
+      if (error) throw error
+      refetch()
+    } catch (err) {
+      console.error(err.message)
     } finally {
       setDeletingId(null)
     }
   }
 
-  const grouped = WEEK_DAYS.reduce((result, currentDay) => {
-    result[currentDay] = (data ?? []).filter(slot => slot.day === currentDay)
-    return result
+  const grouped = DAYS.reduce((acc, d) => {
+    acc[d] = (data ?? []).filter(slot => slot.day === d)
+    return acc
   }, {})
 
   return (
-    <PageLayout width="wide">
-      <div className="space-y-6">
-        <SectionHeader
-          title="Availability"
-          description="Set weekly bookable windows so patients can only choose times that match your clinical schedule."
-        />
+    <PageLayout>
+      <h1 style={{ marginBottom: '0.5rem' }}>My Availability</h1>
+      <p style={{ color: 'gray', marginBottom: '2rem', fontSize: 14 }}>
+        Set your weekly availability so patients can book appointments with you.
+      </p>
 
-        <div className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
-          <Card tone="subtle" className="space-y-5">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                Add availability
-              </p>
-              <h3 className="mt-2 text-xl font-semibold text-slate-900">Create a weekly slot</h3>
-            </div>
+      <div style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: 10, padding: '1.25rem', marginBottom: '2rem', maxWidth: 480 }}>
+        <p style={{ fontWeight: 500, marginBottom: '1rem' }}>Add a slot</p>
 
-            {addError ? <ErrorMessage message={addError} /> : null}
+        {addError && <ErrorMessage message={addError} />}
 
-            <form className="space-y-4" onSubmit={handleAdd}>
-              <Field label="Day" htmlFor="availability-day">
-                <Select id="availability-day" value={day} onChange={event => setDay(event.target.value)}>
-                  {WEEK_DAYS.map(currentDay => (
-                    <option key={currentDay} value={currentDay}>{currentDay}</option>
-                  ))}
-                </Select>
-              </Field>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <TimePicker label="Start time" value={startTime} onChange={setStartTime} />
-                <TimePicker label="End time" value={endTime} onChange={setEndTime} />
-              </div>
-
-              <Button type="submit" loading={adding} block>
-                {adding ? 'Adding...' : 'Add slot'}
-              </Button>
-            </form>
-          </Card>
-
-          <div className="space-y-4">
-            {loading ? <LoadingSpinner message="Loading availability..." /> : null}
-            {error ? <ErrorMessage message={error} onRetry={refetch} /> : null}
-
-            {!loading && !error && WEEK_DAYS.every(currentDay => !grouped[currentDay]?.length) ? (
-              <EmptyState
-                icon={<Clock3 className="h-5 w-5" />}
-                title="No availability set yet"
-                description="Add your first weekly slot and patients will be able to book around it."
-              />
-            ) : null}
-
-            {!loading && !error && WEEK_DAYS.some(currentDay => grouped[currentDay]?.length) ? (
-              <Card className="space-y-6">
-                {WEEK_DAYS.map(currentDay => {
-                  const slots = grouped[currentDay]
-                  if (!slots?.length) return null
-
-                  return (
-                    <section
-                      key={currentDay}
-                      className="space-y-4 border-t border-slate-200/80 pt-6 first:border-t-0 first:pt-0"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-primary-100 bg-white/80 text-primary-700">
-                          <CalendarDays className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold text-slate-900">{currentDay}</p>
-                          <p className="text-xs text-slate-400">{slots.length} slot{slots.length === 1 ? '' : 's'}</p>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-wrap gap-3">
-                        {slots.map(slot => (
-                          <div
-                            key={slot.id}
-                            className="flex items-center gap-3 rounded-full border border-slate-200/80 bg-slate-50/80 px-4 py-2 text-sm text-slate-700"
-                          >
-                            <span className="font-semibold">
-                              {formatTime(slot.start_time)} to {formatTime(slot.end_time)}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => handleDelete(slot.id)}
-                              disabled={deletingId === slot.id}
-                              className="rounded-full px-3 py-1 text-xs font-semibold text-critical transition-colors hover:bg-critical-light disabled:opacity-60"
-                            >
-                              {deletingId === slot.id ? 'Removing...' : 'Remove'}
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </section>
-                  )
-                })}
-              </Card>
-            ) : null}
+        <form onSubmit={handleAdd} style={{ marginTop: addError ? '1rem' : 0 }}>
+          <div style={{ marginBottom: '0.75rem' }}>
+            <label style={{ fontSize: 13, color: 'gray', display: 'block', marginBottom: 4 }}>Day</label>
+            <select
+              value={day}
+              onChange={e => setDay(e.target.value)}
+              style={{ width: '100%', padding: '0.6rem 0.75rem', borderRadius: 8, border: '1px solid #e5e7eb', fontSize: 14 }}
+            >
+              {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
+            </select>
           </div>
-        </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
+            <TimePicker label="Start time" value={startTime} onChange={setStartTime} />
+            <TimePicker label="End time" value={endTime} onChange={setEndTime} />
+          </div>
+
+          <button
+            type="submit"
+            disabled={adding}
+            style={{ width: '100%', padding: '0.7rem', background: '#0e7fa8', color: 'white', border: 'none', borderRadius: 8, fontWeight: 500, cursor: 'pointer', opacity: adding ? 0.7 : 1 }}
+          >
+            {adding ? 'Adding...' : 'Add slot'}
+          </button>
+        </form>
       </div>
+
+      {loading && <LoadingSpinner />}
+      {error && <ErrorMessage message={error} onRetry={refetch} />}
+
+      {data && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          {DAYS.map(d => {
+            const slots = grouped[d]
+            if (!slots.length) return null
+            return (
+              <div key={d}>
+                <p style={{ fontWeight: 500, fontSize: 14, marginBottom: '0.5rem', color: '#374151' }}>{d}</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  {slots.map(slot => (
+                    <div
+                      key={slot.id}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '0.65rem 1rem',
+                        background: 'white',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: 8
+                      }}
+                    >
+                      <span style={{ fontSize: 14 }}>
+                        {formatTime(slot.start_time)} — {formatTime(slot.end_time)}
+                      </span>
+                      <button
+                        onClick={() => handleDelete(slot.id)}
+                        disabled={deletingId === slot.id}
+                        style={{
+                          fontSize: 12,
+                          padding: '4px 10px',
+                          border: '1px solid #fecaca',
+                          borderRadius: 6,
+                          background: '#fee2e2',
+                          color: '#b91c1c',
+                          cursor: 'pointer',
+                          opacity: deletingId === slot.id ? 0.6 : 1
+                        }}
+                      >
+                        {deletingId === slot.id ? 'Removing...' : 'Remove'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })}
+
+          {DAYS.every(d => !grouped[d].length) && (
+            <p style={{ color: 'gray', fontSize: 14 }}>No availability set yet. Add your first slot above.</p>
+          )}
+        </div>
+      )}
     </PageLayout>
   )
 }

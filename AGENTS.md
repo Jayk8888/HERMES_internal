@@ -8,6 +8,7 @@ This repository is HERMES, a hospital management system with:
 - a Supabase backend workspace in `backend/supabase/`
 - diagrams and setup notes in `docs/`
 
+
 The app supports separate patient and doctor flows, including auth, profile completion, appointments, availability, and medical records.
 
 ## Repo Map

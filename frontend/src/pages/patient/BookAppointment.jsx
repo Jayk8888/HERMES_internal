@@ -14,12 +14,9 @@ import { useAuth } from '../../hooks/useAuth'
 import { cn } from '../../lib/cn'
 import { getProfileName } from '../../lib/data'
 import { DAYS_JS, MONTH_NAMES } from '../../lib/constants'
-import { formatTime } from '../../lib/formatters'
+import { dateFromKey, dateTimeFromKeyAndTime, toDateKey, todayDateKey } from '../../lib/dateKeys'
+import { formatDate, formatTime } from '../../lib/formatters'
 import { supabase } from '../../lib/supabase'
-
-function toDateStr(year, month, day) {
-  return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-}
 
 function CalendarPicker({ availability, existingAppointments, selectedDate, onSelect }) {
   const today = new Date()
@@ -32,7 +29,7 @@ function CalendarPicker({ availability, existingAppointments, selectedDate, onSe
   const bookedDates = new Set(
     (existingAppointments || []).map(appointment => {
       const date = new Date(appointment.scheduled_at)
-      return toDateStr(date.getFullYear(), date.getMonth(), date.getDate())
+      return toDateKey(date)
     })
   )
 
@@ -92,14 +89,14 @@ function CalendarPicker({ availability, existingAppointments, selectedDate, onSe
         {cells.map((day, index) => {
           if (!day) return <div key={`empty-${index}`} />
 
-          const dateStr = toDateStr(viewYear, viewMonth, day)
+          const dateStr = toDateKey(new Date(viewYear, viewMonth, day))
           const jsDay = new Date(viewYear, viewMonth, day).getDay()
           const dayName = DAYS_JS[jsDay]
           const isAvailable = availableDays.has(dayName)
-          const isPast = new Date(dateStr) < new Date(today.toDateString())
+          const isPast = dateStr < todayDateKey()
           const isBooked = bookedDates.has(dateStr)
           const isSelected = selectedDate === dateStr
-          const isToday = dateStr === toDateStr(today.getFullYear(), today.getMonth(), today.getDate())
+          const isToday = dateStr === toDateKey(today)
           const isSelectable = isAvailable && !isPast && !isBooked
 
           return (
@@ -194,7 +191,7 @@ export default function PatientBookAppointment() {
   })
 
   const selectedDoctorRecord = doctors?.find(doctor => doctor.id === selectedDoctor) ?? null
-  const selectedDayName = selectedDate ? DAYS_JS[new Date(selectedDate).getDay()] : null
+  const selectedDayName = selectedDate ? DAYS_JS[dateFromKey(selectedDate).getDay()] : null
   const slotsForDay = availability ? availability.filter(slot => slot.day === selectedDayName) : []
 
   function isSlotBooked(slot, dateStr) {
@@ -202,7 +199,7 @@ export default function PatientBookAppointment() {
 
     return existingAppointments.some(appointment => {
       const date = new Date(appointment.scheduled_at)
-      const appointmentDate = toDateStr(date.getFullYear(), date.getMonth(), date.getDate())
+      const appointmentDate = toDateKey(date)
       const appointmentTime = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
       return appointmentDate === dateStr && appointmentTime >= slot.start_time && appointmentTime < slot.end_time
     })
@@ -218,9 +215,7 @@ export default function PatientBookAppointment() {
     setBookingError('')
 
     try {
-      const [startHour, startMinute] = selectedSlot.start_time.split(':')
-      const appointmentDate = new Date(selectedDate)
-      appointmentDate.setHours(Number(startHour), Number(startMinute), 0, 0)
+      const appointmentDate = dateTimeFromKeyAndTime(selectedDate, selectedSlot.start_time)
 
       const { data, error: bookingRpcError } = await supabase
         .rpc('book_appointment', {
@@ -378,7 +373,7 @@ export default function PatientBookAppointment() {
                       <div>
                         <p className="text-sm font-semibold text-slate-900">
                           Available slots for{' '}
-                          {new Date(selectedDate).toLocaleDateString('en-IN', {
+                          {formatDate(selectedDate, {
                             weekday: 'long',
                             day: 'numeric',
                             month: 'long',
@@ -456,7 +451,7 @@ export default function PatientBookAppointment() {
                     Date
                   </p>
                   <p className="mt-1 font-semibold text-white">
-                    {selectedDate ? new Date(selectedDate).toLocaleDateString('en-IN', { dateStyle: 'medium' }) : 'Choose a date'}
+                    {selectedDate ? formatDate(selectedDate, { dateStyle: 'medium' }) : 'Choose a date'}
                   </p>
                 </div>
                 <div>

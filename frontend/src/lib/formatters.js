@@ -1,8 +1,10 @@
+import { dateFromKey } from './dateKeys'
+
 export function formatDate(value, options = {}) {
   if (!value) return 'Not available'
 
   const normalized = typeof value === 'string' && value.length === 10
-    ? `${value}T00:00:00`
+    ? dateFromKey(value)
     : value
 
   const hasCustomOptions = Object.keys(options).length > 0
@@ -38,11 +40,15 @@ export function formatTime(value) {
 export function formatShortDate(value) {
   if (!value) return 'Not available'
 
+  const normalized = typeof value === 'string' && value.length === 10
+    ? dateFromKey(value)
+    : value
+
   return new Intl.DateTimeFormat('en-IN', {
     weekday: 'short',
     day: 'numeric',
     month: 'short',
-  }).format(new Date(value))
+  }).format(new Date(normalized))
 }
 
 export function getAge(value) {

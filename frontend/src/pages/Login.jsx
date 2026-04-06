@@ -1,68 +1,88 @@
 import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
+import AuthShell from '../components/layout/AuthShell'
+import Button from '../components/ui/Button'
+import ErrorMessage from '../components/ui/ErrorMessage'
+import Field from '../components/ui/Field'
+import TextInput from '../components/ui/TextInput'
 import { signIn } from '../features/auth/authService'
 import { useAuth } from '../hooks/useAuth.jsx'
 
 export default function Login() {
-  const navigate = useNavigate()
   const { profile } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState(null)
+  const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  async function handleSubmit(e) {
-    e.preventDefault()
-    setError(null)
+  async function handleSubmit(event) {
+    event.preventDefault()
+    setError('')
     setLoading(true)
+
     try {
       await signIn({ email, password })
-    } catch (err) {
-      setError(err.message)
+    } catch (requestError) {
+      setError(requestError.message)
       setLoading(false)
     }
   }
 
-  if (profile?.role === 'patient') navigate('/patient')
-  if (profile?.role === 'doctor') navigate('/doctor')
+  if (profile?.role === 'patient') return <Navigate to="/patient" replace />
+  if (profile?.role === 'doctor') return <Navigate to="/doctor" replace />
 
   return (
-    <div style={{ maxWidth: 400, margin: '80px auto', padding: '0 1rem' }}>
-      <h1 style={{ marginBottom: '0.25rem' }}>Sign in</h1>
-      <p style={{ marginBottom: '2rem', color: 'gray' }}>
-        Don't have an account? <Link to="/signup">Sign up</Link>
-      </p>
-      {error && (
-        <p style={{ color: 'red', marginBottom: '1rem' }}>{error}</p>
+    <AuthShell
+      eyebrow="Access"
+      title="Sign in to HERMES"
+      description="Return to your patient or doctor workspace to manage appointments, availability, and records."
+      footer={(
+        <>
+          Don&apos;t have an account?{' '}
+          <Link className="font-semibold text-primary-700 hover:text-primary-800" to="/signup">
+            Create one
+          </Link>
+        </>
       )}
-      <form onSubmit={handleSubmit}>
-        <div style={{ marginBottom: '1rem' }}>
-          <label>Email</label>
-          <input
+    >
+      <form className="space-y-5" onSubmit={handleSubmit}>
+        {error ? <ErrorMessage message={error} /> : null}
+
+        <Field label="Email address" htmlFor="email" required>
+          <TextInput
+            id="email"
             type="email"
             value={email}
-            onChange={e => setEmail(e.target.value)}
+            onChange={event => setEmail(event.target.value)}
+            placeholder="you@example.com"
             required
-            style={{ display: 'block', width: '100%', marginTop: 4 }}
           />
-        </div>
-        <div style={{ marginBottom: '1.5rem' }}>
-          <label>Password</label>
-          <input
+        </Field>
+
+        <Field
+          label="Password"
+          htmlFor="password"
+          required
+          action={(
+            <Link className="text-xs font-semibold text-primary-700 hover:text-primary-800" to="/forgot-password">
+              Forgot password?
+            </Link>
+          )}
+        >
+          <TextInput
+            id="password"
             type="password"
             value={password}
-            onChange={e => setPassword(e.target.value)}
+            onChange={event => setPassword(event.target.value)}
+            placeholder="Enter your password"
             required
-            style={{ display: 'block', width: '100%', marginTop: 4 }}
           />
-          <Link to="/forgot-password" style={{ fontSize: '0.85rem', color: 'gray', display: 'block', marginTop: 4 }}>
-            Forgot password?
-          </Link>
-        </div>
-        <button type="submit" disabled={loading} style={{ width: '100%' }}>
+        </Field>
+
+        <Button type="submit" loading={loading} block>
           {loading ? 'Signing in...' : 'Sign in'}
-        </button>
+        </Button>
       </form>
-    </div>
+    </AuthShell>
   )
 }

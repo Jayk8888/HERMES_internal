@@ -18,7 +18,6 @@ import PatientRecordDetail from '../pages/patient/RecordDetail'
 import PatientDoctors from '../pages/patient/Doctors'
 import PatientProfile from '../pages/patient/Profile'
 
-
 import DoctorCompleteProfile from '../pages/doctor/CompleteProfile'
 import DoctorDashboard from '../pages/doctor/Dashboard'
 import DoctorAppointments from '../pages/doctor/Appointments'
@@ -29,7 +28,6 @@ import DoctorPatientDetail from '../pages/doctor/PatientDetail'
 import DoctorAvailability from '../pages/doctor/Availability'
 import DoctorProfile from '../pages/doctor/Profile'
 
-
 export const router = createBrowserRouter([
   { path: '/', element: <Home /> },
   { path: '/login', element: <Login /> },
@@ -39,7 +37,6 @@ export const router = createBrowserRouter([
   { path: '/unauthorized', element: <Unauthorized /> },
 
   { path: '/patient/complete-profile', element: <PatientCompleteProfile /> },
-
   {
     path: '/patient',
     element: <RoleGuard role="patient"><PatientDashboard /></RoleGuard>,
@@ -73,6 +70,7 @@ export const router = createBrowserRouter([
     element: <RoleGuard role="patient"><PatientProfile /></RoleGuard>,
   },
 
+  { path: '/doctor/complete-profile', element: <DoctorCompleteProfile /> },
   {
     path: '/doctor',
     element: <RoleGuard role="doctor"><DoctorDashboard /></RoleGuard>,
@@ -105,5 +103,4 @@ export const router = createBrowserRouter([
     path: '/doctor/profile',
     element: <RoleGuard role="doctor"><DoctorProfile /></RoleGuard>,
   },
-  { path: '/doctor/complete-profile', element: <DoctorCompleteProfile /> },
 ])

@@ -1,21 +1,30 @@
-import { useNavigate } from 'react-router-dom'
+import { CalendarPlus2 } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import PageLayout from '../../components/layout/PageLayout'
-import LoadingSpinner from '../../components/ui/LoadingSpinner'
+import Button from '../../components/ui/Button'
+import Card from '../../components/ui/Card'
+import EmptyState from '../../components/ui/EmptyState'
 import ErrorMessage from '../../components/ui/ErrorMessage'
+import LoadingSpinner from '../../components/ui/LoadingSpinner'
+import SectionHeader from '../../components/ui/SectionHeader'
+import StatusBadge from '../../components/ui/StatusBadge'
 import { useFetch } from '../../hooks/useFetch'
+import { useAuth } from '../../hooks/useAuth'
+import { formatDateTime } from '../../lib/formatters'
 import { supabase } from '../../lib/supabase'
 
-function statusColor(status) {
-  if (status === 'scheduled') return { background: '#e0f2fe', color: '#0369a1' }
-  if (status === 'completed') return { background: '#dcfce7', color: '#15803d' }
-  if (status === 'cancelled') return { background: '#fee2e2', color: '#b91c1c' }
+function getProfile(value) {
+  if (!value) return {}
+  return Array.isArray(value) ? value[0] : value
 }
 
 export default function PatientAppointments() {
-  const navigate = useNavigate()
+  const { user } = useAuth()
 
-  const { data, loading, error, refetch } = useFetch(() =>
-    supabase
+  const { data, loading, error, refetch } = useFetch(async () => {
+    if (!user?.id) return []
+
+    const { data: appointments, error: fetchError } = await supabase
       .from('appointments')
       .select(`
         id,
@@ -23,68 +32,73 @@ export default function PatientAppointments() {
         status,
         doctor:doctor_id (
           id,
+          specialization,
           profiles (full_name, email)
         )
       `)
       .order('scheduled_at', { ascending: false })
-      .then(r => {
-        if (r.error) throw r.error
-        return r.data
-      })
-  )
+    if (fetchError) throw fetchError
+    return appointments || []
+  }, [user?.id], { key: `patient-appointments:${user?.id ?? 'anonymous'}` })
 
   return (
-    <PageLayout>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-        <h1>My Appointments</h1>
-        <button onClick={() => navigate('/patient/appointments/book')}>
-          + Book appointment
-        </button>
-      </div>
+    <PageLayout width="wide">
+      <div className="space-y-6">
+        <SectionHeader
+          title="Appointments"
+          description="Review scheduled, completed, and cancelled visits with direct access to each appointment detail."
+          actions={(
+            <Button as={Link} to="/patient/appointments/book">
+              <CalendarPlus2 className="h-4 w-4" />
+              Book appointment
+            </Button>
+          )}
+        />
 
-      {loading && <LoadingSpinner />}
-      {error && <ErrorMessage message={error} onRetry={refetch} />}
+        {loading ? <LoadingSpinner message="Loading appointments..." /> : null}
+        {error ? <ErrorMessage message={error} onRetry={refetch} /> : null}
 
-      {data && data.length === 0 && (
-        <p style={{ color: 'gray' }}>No appointments yet. Book one to get started.</p>
-      )}
+        {loading || error ? null : data.length === 0 ? (
+          <EmptyState
+            icon="A"
+            title="No appointments found"
+            description="Appointments will appear here once you start booking visits with your doctors."
+          />
+        ) : (
+          <div className="grid gap-4">
+            {data.map(appointment => {
+              const doctor = getProfile(appointment.doctor)
+              const doctorProfile = getProfile(doctor?.profiles)
 
-      {data && data.map(appt => (
-        <div
-          key={appt.id}
-          onClick={() => navigate(`/patient/appointments/${appt.id}`)}
-          style={{
-            padding: '1rem 1.25rem',
-            borderRadius: 10,
-            border: '1px solid #e5e7eb',
-            marginBottom: '0.75rem',
-            cursor: 'pointer',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            background: 'white'
-          }}
-        >
-          <div>
-            <p style={{ fontWeight: 500, marginBottom: 4 }}>
-              Dr. {appt.doctor?.profiles?.full_name ?? 'Unknown'}
-            </p>
-            <p style={{ fontSize: 14, color: 'gray' }}>
-              {new Date(appt.scheduled_at).toLocaleString()}
-            </p>
+              return (
+                <Card key={appointment.id} className="space-y-4">
+                  <div className="grid gap-4 lg:grid-cols-[1.2fr_0.9fr_auto] lg:items-center">
+                    <div>
+                      <h3 className="mt-2 text-lg font-semibold text-slate-900">
+                        {doctorProfile?.full_name ? `Dr. ${doctorProfile.full_name}` : 'Unknown doctor'}
+                      </h3>
+                      <p className="mt-1 text-sm text-slate-500">
+                        {doctor?.specialization || 'Specialization not available'}
+                      </p>
+                    </div>
+
+                    <div className="space-y-2 text-sm text-slate-500">
+                      <p>{formatDateTime(appointment.scheduled_at)}</p>
+                      <StatusBadge status={appointment.status} />
+                    </div>
+
+                    <div className="lg:justify-self-end">
+                      <Button as={Link} to={`/patient/appointments/${appointment.id}`}>
+                        View details
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+              )
+            })}
           </div>
-          <span style={{
-            fontSize: 12,
-            fontWeight: 500,
-            padding: '4px 10px',
-            borderRadius: 20,
-            textTransform: 'capitalize',
-            ...statusColor(appt.status)
-          }}>
-            {appt.status}
-          </span>
-        </div>
-      ))}
+        )}
+      </div>
     </PageLayout>
   )
 }

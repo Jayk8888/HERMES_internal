@@ -1,71 +1,72 @@
-import { Link, useNavigate } from 'react-router-dom'
+import { CalendarDays, CalendarPlus2, FileText, Stethoscope } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import PageLayout from '../../components/layout/PageLayout'
-import LoadingSpinner from '../../components/ui/LoadingSpinner'
+import Button from '../../components/ui/Button'
+import Card from '../../components/ui/Card'
+import EmptyState from '../../components/ui/EmptyState'
 import ErrorMessage from '../../components/ui/ErrorMessage'
+import LoadingSpinner from '../../components/ui/LoadingSpinner'
+import MetricCard from '../../components/ui/MetricCard'
+import SectionHeader from '../../components/ui/SectionHeader'
 import { useFetch } from '../../hooks/useFetch'
 import { useAuth } from '../../hooks/useAuth'
+import { getProfileName, pickFirst } from '../../lib/data'
+import { formatDate, formatDateTime } from '../../lib/formatters'
 import { supabase } from '../../lib/supabase'
 
-function statusColor(status) {
-  if (status === 'scheduled') return { background: '#e0f2fe', color: '#0369a1' }
-  if (status === 'completed') return { background: '#dcfce7', color: '#15803d' }
-  if (status === 'cancelled') return { background: '#fee2e2', color: '#b91c1c' }
-}
-
 export default function PatientDashboard() {
-  const navigate = useNavigate()
-  const { user, loading: authLoading } = useAuth()
+  const { user, profile, loading: authLoading } = useAuth()
 
-  const { data: stats, loading: statsLoading, error: statsError } = useFetch(async () => {
-    if (!user?.id) return { appointments: 0, doctors: 0, records: 0, lastRecord: null }
+  const {
+    data: stats,
+    loading: statsLoading,
+    error: statsError,
+    refetch: refetchStats,
+  } = useFetch(async () => {
+    if (!user?.id) {
+      return { appointments: 0, doctors: 0, records: 0, lastRecord: null }
+    }
 
-    try {
-      const [appointmentsRes, appointmentCountRes, recordsRes] = await Promise.all([
-        supabase
-          .from('appointments')
-          .select('id')
-          .eq('patient_id', user.id)
-          .order('scheduled_at', { ascending: false })
-          .limit(1),
-        supabase
-          .from('appointments')
-          .select('id', { count: 'exact' })
-          .eq('patient_id', user.id),
-        supabase
-          .from('medical_records')
-          .select('created_at', { count: 'exact' })
-          .order('created_at', { ascending: false })
-          .limit(1)
-      ])
-
-      if (appointmentCountRes.error) throw appointmentCountRes.error
-      if (recordsRes.error) throw recordsRes.error
-
-      const appointmentCount = appointmentCountRes.count || 0
-      const lastRecord = (recordsRes.data?.[0]?.created_at) || null
-
-      // Get unique doctor count
-      const { data: allAppointments, error: allError } = await supabase
+    const [appointmentCountRes, doctorRowsRes, recordsRes] = await Promise.all([
+      supabase
+        .from('appointments')
+        .select('id', { count: 'exact', head: true })
+        .eq('patient_id', user.id),
+      supabase
         .from('appointments')
         .select('doctor_id')
-        .eq('patient_id', user.id)
+        .eq('patient_id', user.id),
+      supabase
+        .from('medical_records')
+        .select(`
+          created_at,
+          appointment:appointments!inner (
+            patient_id
+          )
+        `, { count: 'exact' })
+        .eq('appointment.patient_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1),
+    ])
 
-      if (allError) throw allError
+    if (appointmentCountRes.error) throw appointmentCountRes.error
+    if (doctorRowsRes.error) throw doctorRowsRes.error
+    if (recordsRes.error) throw recordsRes.error
 
-      const uniqueDoctors = new Set((allAppointments || []).map(a => a.doctor_id)).size
-
-      return {
-        appointments: appointmentCount,
-        doctors: uniqueDoctors,
-        records: recordsRes.count || 0,
-        lastRecord
-      }
-    } catch (error) {
-      throw error
+    return {
+      appointments: appointmentCountRes.count || 0,
+      doctors: new Set((doctorRowsRes.data ?? []).map(row => row.doctor_id)).size,
+      records: recordsRes.count || 0,
+      lastRecord: recordsRes.data?.[0]?.created_at ?? null,
     }
-  }, [user?.id])
+  }, [user?.id], { key: `patient-dashboard-stats:${user?.id ?? 'anonymous'}` })
 
-  const { data: upcomingAppointments, loading: appointmentsLoading, error: appointmentsError } = useFetch(async () => {
+  const {
+    data: upcomingAppointments,
+    loading: appointmentsLoading,
+    error: appointmentsError,
+    refetch: refetchAppointments,
+  } = useFetch(async () => {
     if (!user?.id) return []
 
     const { data, error } = await supabase
@@ -76,6 +77,7 @@ export default function PatientDashboard() {
         status,
         doctor:doctor_id (
           id,
+          specialization,
           profiles (full_name, email)
         )
       `)
@@ -86,214 +88,171 @@ export default function PatientDashboard() {
 
     if (error) throw error
     return data || []
-  }, [user?.id])
+  }, [user?.id], { key: `patient-dashboard-upcoming:${user?.id ?? 'anonymous'}` })
 
   if (authLoading) {
     return (
       <PageLayout>
-        <h1>Dashboard</h1>
-        <LoadingSpinner />
+        <LoadingSpinner message="Loading your workspace..." />
       </PageLayout>
     )
   }
 
   return (
-    <PageLayout>
-      <div style={{ display: 'grid', gap: '2rem' }}>
-        <div>
-          <h1 style={{ marginBottom: '0.5rem' }}>Welcome back!</h1>
-          <p style={{ color: 'gray' }}>Here's your health dashboard</p>
-        </div>
-        {/* Stats Grid */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '1rem'
-        }}>
-          <div style={{
-            padding: '1.5rem',
-            borderRadius: 12,
-            border: '1px solid #e5e7eb',
-            background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)'
-          }}>
-            <p style={{ fontSize: 12, color: '#666', marginBottom: '0.5rem' }}>Total Appointments</p>
-            <p style={{ fontSize: 28, fontWeight: 600, color: '#0369a1' }}>
-              {statsLoading ? '-' : stats?.appointments || 0}
-            </p>
-          </div>
-
-          <div style={{
-            padding: '1.5rem',
-            borderRadius: 12,
-            border: '1px solid #e5e7eb',
-            background: 'linear-gradient(135deg, #f0f9ff 0%, #dbeafe 100%)'
-          }}>
-            <p style={{ fontSize: 12, color: '#666', marginBottom: '0.5rem' }}>Connected Doctors</p>
-            <p style={{ fontSize: 28, fontWeight: 600, color: '#0369a1' }}>
-              {statsLoading ? '-' : stats?.doctors || 0}
-            </p>
-          </div>
-
-          <div style={{
-            padding: '1.5rem',
-            borderRadius: 12,
-            border: '1px solid #e5e7eb',
-            background: 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)'
-          }}>
-            <p style={{ fontSize: 12, color: '#666', marginBottom: '0.5rem' }}>Medical Records</p>
-            <p style={{ fontSize: 28, fontWeight: 600, color: '#15803d' }}>
-              {statsLoading ? '-' : stats?.records || 0}
-            </p>
-          </div>
-        </div>
-
-        {/* Upcoming Appointments */}
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <h2>Upcoming Appointments</h2>
-            <Link to="/patient/appointments" style={{ fontSize: 14, color: '#0369a1', textDecoration: 'none' }}>
-              View all →
-            </Link>
-          </div>
-
-          {appointmentsLoading && <LoadingSpinner />}
-          {appointmentsError && (
-            <ErrorMessage message={appointmentsError} onRetry={() => window.location.reload()} />
-          )}
-
-          {!appointmentsLoading && !appointmentsError && upcomingAppointments?.length === 0 && (
-            <div style={{
-              padding: '2rem',
-              borderRadius: 12,
-              border: '1px solid #e5e7eb',
-              textAlign: 'center',
-              background: '#f9fafb'
-            }}>
-              <p style={{ color: 'gray', marginBottom: '1rem' }}>No upcoming appointments</p>
-              <button
-                onClick={() => navigate('/patient/appointments/book')}
-                style={{
-                  padding: '0.5rem 1rem',
-                  borderRadius: 8,
-                  border: 'none',
-                  background: '#0369a1',
-                  color: 'white',
-                  cursor: 'pointer',
-                  fontWeight: 500
-                }}
-              >
-                Book an appointment
-              </button>
-            </div>
-          )}
-
-          {!appointmentsLoading && !appointmentsError && upcomingAppointments?.length > 0 && (
-            <div style={{ display: 'grid', gap: '0.75rem' }}>
-              {upcomingAppointments.map(appt => (
-                <div
-                  key={appt.id}
-                  onClick={() => navigate(`/patient/appointments/${appt.id}`)}
-                  style={{
-                    padding: '1rem 1.25rem',
-                    borderRadius: 10,
-                    border: '1px solid #e5e7eb',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    background: 'white',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseOver={(e) => e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)'}
-                  onMouseOut={(e) => e.currentTarget.style.boxShadow = 'none'}
-                >
-                  <div>
-                    <p style={{ fontWeight: 500, marginBottom: 4 }}>
-                      Dr. {appt.doctor?.profiles?.full_name ?? 'Unknown'}
-                    </p>
-                    <p style={{ fontSize: 14, color: 'gray' }}>
-                      {new Date(appt.scheduled_at).toLocaleString()}
-                    </p>
-                  </div>
-                  <span style={{
-                    fontSize: 12,
-                    fontWeight: 500,
-                    padding: '4px 10px',
-                    borderRadius: 20,
-                    textTransform: 'capitalize',
-                    ...statusColor(appt.status)
-                  }}>
-                    {appt.status}
-                  </span>
+    <PageLayout width="wide">
+      <div className="space-y-6">
+        <Card tone="brand">
+          <div className="grid gap-6 lg:grid-cols-[1.4fr_0.8fr]">
+            <div className="flex h-full flex-col">
+              <h2 className="font-display text-4xl font-semibold tracking-tight text-white">
+                Welcome back, {profile?.full_name?.split(' ')[0] ?? 'there'}
+              </h2>
+              <div className="mt-auto pt-5">
+                <div className="flex flex-wrap gap-3">
+                <Button as={Link} to="/patient/appointments/book" className="bg-white text-primary-800 hover:bg-primary-50">
+                  <CalendarPlus2 className="h-4 w-4" />
+                  Book appointment
+                </Button>
+                <Button as={Link} to="/patient/records" variant="secondary" className="border-white/20 bg-white/10 text-white hover:bg-white/15">
+                  <FileText className="h-4 w-4" />
+                  View records
+                </Button>
                 </div>
-              ))}
+              </div>
             </div>
-          )}
-        </div>
 
-        {/* Quick Actions */}
-        <div>
-          <h2 style={{ marginBottom: '1rem' }}>Quick Actions</h2>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-            gap: '1rem'
-          }}>
-            <button
-              onClick={() => navigate('/patient/appointments/book')}
-              style={{
-                padding: '1rem',
-                borderRadius: 10,
-                border: '1px solid #e5e7eb',
-                background: 'white',
-                cursor: 'pointer',
-                textAlign: 'left',
-                transition: 'all 0.2s'
-              }}
-              onMouseOver={(e) => e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)'}
-              onMouseOut={(e) => e.currentTarget.style.boxShadow = 'none'}
-            >
-              <p style={{ fontWeight: 600, marginBottom: '0.25rem' }}>📅 Book Appointment</p>
-              <p style={{ fontSize: 14, color: 'gray' }}>Schedule a new appointment with a doctor</p>
-            </button>
+            <div className="grid content-start gap-4 border-t border-white/10 pt-5 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary-50/65">
+                  Care snapshot
+                </p>
+              </div>
 
-            <button
-              onClick={() => navigate('/patient/appointments')}
-              style={{
-                padding: '1rem',
-                borderRadius: 10,
-                border: '1px solid #e5e7eb',
-                background: 'white',
-                cursor: 'pointer',
-                textAlign: 'left',
-                transition: 'all 0.2s'
-              }}
-              onMouseOver={(e) => e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)'}
-              onMouseOut={(e) => e.currentTarget.style.boxShadow = 'none'}
-            >
-              <p style={{ fontWeight: 600, marginBottom: '0.25rem' }}>📋 View Appointments</p>
-              <p style={{ fontSize: 14, color: 'gray' }}>Check all your appointments</p>
-            </button>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
+                <div>
+                  <p className="text-sm text-primary-50/70">Connected doctors</p>
+                  <p className="font-display text-3xl font-semibold text-white">
+                    {statsLoading ? '—' : stats?.doctors ?? 0}
+                  </p>
+                </div>
 
-            <button
-              onClick={() => navigate('/patient/records')}
-              style={{
-                padding: '1rem',
-                borderRadius: 10,
-                border: '1px solid #e5e7eb',
-                background: 'white',
-                cursor: 'pointer',
-                textAlign: 'left',
-                transition: 'all 0.2s'
-              }}
-              onMouseOver={(e) => e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)'}
-              onMouseOut={(e) => e.currentTarget.style.boxShadow = 'none'}
-            >
-              <p style={{ fontWeight: 600, marginBottom: '0.25rem' }}>📄 Medical Records</p>
-              <p style={{ fontSize: 14, color: 'gray' }}>View your medical records</p>
-            </button>
+                <div>
+                  <p className="text-sm text-primary-50/70">Latest record</p>
+                  <p className="text-sm font-semibold text-white">
+                    {stats?.lastRecord ? formatDateTime(stats.lastRecord) : 'No records yet'}
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
+        </Card>
+
+        {statsError ? <ErrorMessage message={statsError} onRetry={refetchStats} /> : null}
+
+        <div className="grid gap-5 md:grid-cols-3">
+          <MetricCard
+            label="Total appointments"
+            value={statsLoading ? '—' : stats?.appointments ?? 0}
+            meta="Scheduled, completed, and cancelled visits."
+            icon={<CalendarDays className="h-5 w-5" />}
+          />
+          <MetricCard
+            label="Connected doctors"
+            value={statsLoading ? '—' : stats?.doctors ?? 0}
+            meta="Doctors associated with your appointment history."
+            icon={<Stethoscope className="h-5 w-5" />}
+          />
+          <MetricCard
+            label="Medical records"
+            value={statsLoading ? '—' : stats?.records ?? 0}
+            meta="Clinical notes and prescriptions attached to appointments."
+            icon={<FileText className="h-5 w-5" />}
+          />
         </div>
+
+        <section className="space-y-4">
+          <SectionHeader
+            eyebrow="Upcoming care"
+            title="Scheduled appointments"
+            description="Your next confirmed visits appear here with direct access to the appointment detail view."
+            actions={(
+              <Button as={Link} to="/patient/appointments" variant="secondary">
+                View all appointments
+              </Button>
+            )}
+          />
+
+          {appointmentsLoading ? <LoadingSpinner message="Loading upcoming appointments..." /> : null}
+          {appointmentsError ? <ErrorMessage message={appointmentsError} onRetry={refetchAppointments} /> : null}
+
+          {!appointmentsLoading && !appointmentsError && upcomingAppointments?.length === 0 ? (
+            <EmptyState
+              icon="A"
+              title="No upcoming appointments"
+              description="When you schedule a visit, it will appear here with doctor details and confirmed timing."
+              action={(
+                <Button as={Link} to="/patient/appointments/book">
+                  Book your first appointment
+                </Button>
+              )}
+            />
+          ) : null}
+
+          {!appointmentsLoading && !appointmentsError && upcomingAppointments?.length > 0 ? (
+            <div className="space-y-4">
+              {upcomingAppointments.map(appointment => {
+                const doctor = pickFirst(appointment.doctor)
+                const doctorProfile = pickFirst(doctor?.profiles)
+
+                return (
+                  <Card key={appointment.id} interactive className="space-y-4">
+                    <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                      <div className="min-w-0">
+                        <h3 className="font-display text-xl font-semibold tracking-tight text-slate-900">
+                          Dr. {getProfileName(doctorProfile)}
+                        </h3>
+                        <p className="mt-1 text-sm text-slate-500">
+                          {doctor?.specialization || 'Specialization not available'}
+                        </p>
+                        <p className="mt-2 text-xs text-slate-400">
+                          {doctorProfile?.email || 'No email available'}
+                        </p>
+                      </div>
+
+                      <div className="flex flex-col gap-3 xl:items-end">
+                        <div className="min-w-[10rem] xl:text-right">
+                          <p className="text-base font-semibold text-slate-900">
+                            {formatDate(appointment.scheduled_at, { weekday: 'short', day: 'numeric', month: 'short' })}
+                          </p>
+                          <p className="mt-1 text-sm text-slate-500">
+                            {formatDateTime(appointment.scheduled_at, { hour: 'numeric', minute: '2-digit' })}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                      <p className="flex-1 text-sm leading-relaxed text-slate-600">
+                        Your appointment is confirmed and ready to open from the detailed visit view.
+                      </p>
+
+                      <Button
+                        as={Link}
+                        to={`/patient/appointments/${appointment.id}`}
+                        variant="primary"
+                        size="medium"
+                        className="w-full shrink-0 sm:w-auto"
+                      >
+                        View appointment
+                      </Button>
+                    </div>
+                  </Card>
+                )
+              })}
+            </div>
+          ) : null}
+        </section>
+
       </div>
     </PageLayout>
   )

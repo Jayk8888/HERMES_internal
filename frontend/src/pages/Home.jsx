@@ -3,87 +3,30 @@ import { Navigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { supabase } from '../lib/supabase'
 
-const HOME_LOOKUP_TIMEOUT_MS = 2500
-
 export default function Home() {
   const { user, profile, loading } = useAuth()
-  const [doctorLookup, setDoctorLookup] = useState({ userId: null, exists: null })
-  const [patientLookup, setPatientLookup] = useState({ userId: null, exists: null })
+  const [doctorExists, setDoctorExists] = useState(null)
+  const [patientExists, setPatientExists] = useState(null)
 
   useEffect(() => {
-    if (profile?.role !== 'doctor' || !user?.id) return undefined
-
-    let active = true
-    const currentUserId = user.id
-    const timeoutId = window.setTimeout(() => {
-      if (active) {
-        setDoctorLookup({ userId: currentUserId, exists: true })
-      }
-    }, HOME_LOOKUP_TIMEOUT_MS)
-
-    void supabase
+    if (profile?.role !== 'doctor' || !user) return
+    supabase
       .from('doctors')
       .select('id')
       .eq('id', user.id)
-      .maybeSingle()
-      .then(({ data, error }) => {
-        if (!active) return
-
-        window.clearTimeout(timeoutId)
-
-        if (error) {
-          console.error('Failed to confirm doctor profile completion:', error.message)
-          setDoctorLookup({ userId: currentUserId, exists: true })
-          return
-        }
-
-        setDoctorLookup({ userId: currentUserId, exists: Boolean(data) })
-      })
-
-    return () => {
-      active = false
-      window.clearTimeout(timeoutId)
-    }
-  }, [user?.id, profile?.role])
+      .single()
+      .then(({ data }) => setDoctorExists(!!data))
+  }, [user, profile])
 
   useEffect(() => {
-    if (profile?.role !== 'patient' || !user?.id) return undefined
-
-    let active = true
-    const currentUserId = user.id
-    const timeoutId = window.setTimeout(() => {
-      if (active) {
-        setPatientLookup({ userId: currentUserId, exists: true })
-      }
-    }, HOME_LOOKUP_TIMEOUT_MS)
-
-    void supabase
+    if (profile?.role !== 'patient' || !user) return
+    supabase
       .from('patients')
       .select('id')
       .eq('id', user.id)
-      .maybeSingle()
-      .then(({ data, error }) => {
-        if (!active) return
-
-        window.clearTimeout(timeoutId)
-
-        if (error) {
-          console.error('Failed to confirm patient profile completion:', error.message)
-          setPatientLookup({ userId: currentUserId, exists: true })
-          return
-        }
-
-        setPatientLookup({ userId: currentUserId, exists: Boolean(data) })
-      })
-
-    return () => {
-      active = false
-      window.clearTimeout(timeoutId)
-    }
-  }, [user?.id, profile?.role])
-
-  const doctorExists = doctorLookup.userId === user?.id ? doctorLookup.exists : null
-  const patientExists = patientLookup.userId === user?.id ? patientLookup.exists : null
+      .single()
+      .then(({ data }) => setPatientExists(!!data))
+  }, [user, profile])
 
   if (loading) return null
   if (!user) return <Navigate to="/login" replace />

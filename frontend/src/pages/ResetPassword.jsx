@@ -1,10 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import AuthShell from '../components/layout/AuthShell'
-import Button from '../components/ui/Button'
-import ErrorMessage from '../components/ui/ErrorMessage'
-import Field from '../components/ui/Field'
-import TextInput from '../components/ui/TextInput'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
 export default function ResetPassword() {
@@ -12,75 +7,63 @@ export default function ResetPassword() {
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError] = useState(null)
 
-  async function handleSubmit(event) {
-    event.preventDefault()
-    setError('')
-
+  async function handleSubmit(e) {
+    e.preventDefault()
+    setError(null)
     if (password !== confirm) {
       setError('Passwords do not match')
       return
     }
-
     setLoading(true)
-
     try {
-      const { error: updateError } = await supabase.auth.updateUser({ password })
-      if (updateError) throw updateError
+      const { error } = await supabase.auth.updateUser({ password })
+      if (error) throw error
       navigate('/login')
-    } catch (requestError) {
-      setError(requestError.message)
+    } catch (err) {
+      setError(err.message)
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <AuthShell
-      eyebrow="Recovery"
-      title="Choose a new password"
-      description="Set a fresh password for your HERMES account and return to sign in."
-      footer={(
-        <>
-          Need a new link?{' '}
-          <Link className="font-semibold text-primary-700 hover:text-primary-800" to="/forgot-password">
-            Request another reset email
-          </Link>
-        </>
+    <div style={{ maxWidth: 400, margin: '80px auto', padding: '0 1rem' }}>
+      <h1 style={{ marginBottom: '0.25rem' }}>Reset password</h1>
+      <p style={{ marginBottom: '2rem', color: 'gray' }}>
+        Enter your new password below
+      </p>
+      {error && (
+        <p style={{ color: 'red', marginBottom: '1rem' }}>{error}</p>
       )}
-    >
-      <form className="space-y-5" onSubmit={handleSubmit}>
-        {error ? <ErrorMessage message={error} /> : null}
-
-        <Field label="New password" htmlFor="new-password" hint="Minimum 6 characters" required>
-          <TextInput
-            id="new-password"
+      <form onSubmit={handleSubmit}>
+        <div style={{ marginBottom: '1rem' }}>
+          <label>New password</label>
+          <input
             type="password"
             value={password}
-            onChange={event => setPassword(event.target.value)}
-            placeholder="Enter a new password"
-            minLength={6}
+            onChange={e => setPassword(e.target.value)}
             required
+            minLength={6}
+            style={{ display: 'block', width: '100%', marginTop: 4 }}
           />
-        </Field>
-
-        <Field label="Confirm password" htmlFor="confirm-password" required>
-          <TextInput
-            id="confirm-password"
+        </div>
+        <div style={{ marginBottom: '1.5rem' }}>
+          <label>Confirm password</label>
+          <input
             type="password"
             value={confirm}
-            onChange={event => setConfirm(event.target.value)}
-            placeholder="Re-enter your password"
-            minLength={6}
+            onChange={e => setConfirm(e.target.value)}
             required
+            minLength={6}
+            style={{ display: 'block', width: '100%', marginTop: 4 }}
           />
-        </Field>
-
-        <Button type="submit" loading={loading} block>
-          {loading ? 'Updating password...' : 'Update password'}
-        </Button>
+        </div>
+        <button type="submit" disabled={loading} style={{ width: '100%' }}>
+          {loading ? 'Updating...' : 'Update password'}
+        </button>
       </form>
-    </AuthShell>
+    </div>
   )
 }

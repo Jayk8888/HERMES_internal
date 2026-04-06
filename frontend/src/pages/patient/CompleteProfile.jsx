@@ -1,85 +1,80 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import AuthShell from '../../components/layout/AuthShell'
-import Button from '../../components/ui/Button'
-import ErrorMessage from '../../components/ui/ErrorMessage'
-import Field from '../../components/ui/Field'
-import TextInput from '../../components/ui/TextInput'
-import { useAuth } from '../../hooks/useAuth.jsx'
 import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../hooks/useAuth.jsx'
 
 export default function PatientCompleteProfile() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const [dob, setDob] = useState('')
   const [phoneNumber, setPhoneNumber] = useState('')
-  const [error, setError] = useState('')
+  const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
 
-  async function handleSubmit(event) {
-    event.preventDefault()
-    setError('')
+  async function handleSubmit(e) {
+    e.preventDefault()
+    setError(null)
     setLoading(true)
-
     try {
       const { error: patientError } = await supabase
         .from('patients')
         .insert({ id: user.id, dob })
-
       if (patientError) throw patientError
 
-      if (phoneNumber.trim()) {
+      if (phoneNumber) {
         const { error: profileError } = await supabase
           .from('profiles')
-          .update({ phone_number: phoneNumber.trim() })
+          .update({ phone_number: phoneNumber })
           .eq('id', user.id)
-
         if (profileError) throw profileError
       }
 
       navigate('/')
-    } catch (saveError) {
-      setError(saveError.message)
+    } catch (err) {
+      setError(err.message)
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <AuthShell
-      eyebrow="Patient setup"
-      title="Complete your patient profile"
-      description="We need a few clinical identity details before your dashboard and records become available."
-    >
-      <form className="space-y-5" onSubmit={handleSubmit}>
-        {error ? <ErrorMessage message={error} /> : null}
+    <div style={{ maxWidth: 400, margin: '80px auto', padding: '0 1rem' }}>
+      <h1 style={{ marginBottom: '0.25rem' }}>Complete your profile</h1>
+      <p style={{ color: 'gray', marginBottom: '2rem' }}>
+        We need a few more details before you can access your dashboard.
+      </p>
 
-        <Field label="Date of birth" htmlFor="patient-dob" required>
-          <TextInput
-            id="patient-dob"
+      {error && <p style={{ color: 'red', marginBottom: '1rem' }}>⚠ {error}</p>}
+
+      <form onSubmit={handleSubmit}>
+        <div style={{ marginBottom: '1rem' }}>
+          <label>Date of birth</label>
+          <input
             type="date"
             value={dob}
-            onChange={event => setDob(event.target.value)}
+            onChange={e => setDob(e.target.value)}
             required
+            style={{ display: 'block', width: '100%', marginTop: 4 }}
           />
-        </Field>
+        </div>
 
-        <Field label="Phone number" htmlFor="patient-phone" hint="Optional. Must be a 10-digit number.">
-          <TextInput
-            id="patient-phone"
+        <div style={{ marginBottom: '1.5rem' }}>
+          <label>Phone number <span style={{ color: 'gray', fontWeight: 400 }}>(optional)</span></label>
+          <input
             type="text"
             value={phoneNumber}
-            onChange={event => setPhoneNumber(event.target.value)}
+            onChange={e => setPhoneNumber(e.target.value)}
             inputMode="numeric"
             pattern="[0-9]{10}"
-            placeholder="9876543210"
+            placeholder="10-digit number"
+            style={{ display: 'block', width: '100%', marginTop: 4 }}
           />
-        </Field>
+        </div>
 
-        <Button type="submit" loading={loading} block>
-          {loading ? 'Completing setup...' : 'Complete setup'}
-        </Button>
+        <button type="submit" disabled={loading} style={{ width: '100%' }}>
+          {loading ? 'Saving...' : 'Complete setup'}
+        </button>
       </form>
-    </AuthShell>
+    </div>
   )
 }

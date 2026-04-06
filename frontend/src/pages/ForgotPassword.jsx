@@ -1,80 +1,64 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import AuthShell from '../components/layout/AuthShell'
-import Button from '../components/ui/Button'
-import ErrorMessage from '../components/ui/ErrorMessage'
-import Field from '../components/ui/Field'
-import InlineAlert from '../components/ui/InlineAlert'
-import TextInput from '../components/ui/TextInput'
 import { supabase } from '../lib/supabase'
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError] = useState(null)
   const [sent, setSent] = useState(false)
 
-  async function handleSubmit(event) {
-    event.preventDefault()
-    setError('')
+  async function handleSubmit(e) {
+    e.preventDefault()
+    setError(null)
     setLoading(true)
-
     try {
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`
       })
-
-      if (resetError) throw resetError
+      if (error) throw error
       setSent(true)
-    } catch (requestError) {
-      setError(requestError.message)
+    } catch (err) {
+      setError(err.message)
     } finally {
       setLoading(false)
     }
   }
 
+  if (sent) return (
+    <div style={{ maxWidth: 400, margin: '80px auto', padding: '0 1rem' }}>
+      <h1 style={{ marginBottom: '0.5rem' }}>Check your email</h1>
+      <p style={{ color: 'gray', marginBottom: '2rem' }}>
+        We sent a password reset link to <strong>{email}</strong>
+      </p>
+      <Link to="/login">Back to sign in</Link>
+    </div>
+  )
+
   return (
-    <AuthShell
-      eyebrow="Recovery"
-      title={sent ? 'Check your email' : 'Reset your password'}
-      description={sent
-        ? `We sent a password reset link to ${email}.`
-        : 'Enter the email tied to your account and we will send a secure reset link.'}
-      footer={(
-        <>
-          Remembered it?{' '}
-          <Link className="font-semibold text-primary-700 hover:text-primary-800" to="/login">
-            Back to sign in
-          </Link>
-        </>
+    <div style={{ maxWidth: 400, margin: '80px auto', padding: '0 1rem' }}>
+      <h1 style={{ marginBottom: '0.25rem' }}>Forgot password</h1>
+      <p style={{ marginBottom: '2rem', color: 'gray' }}>
+        Remember it? <Link to="/login">Sign in</Link>
+      </p>
+      {error && (
+        <p style={{ color: 'red', marginBottom: '1rem' }}>{error}</p>
       )}
-    >
-      {sent ? (
-        <InlineAlert
-          tone="success"
-          title="Password reset email sent"
-          message="Open the link in your inbox to choose a new password."
-        />
-      ) : (
-        <form className="space-y-5" onSubmit={handleSubmit}>
-          {error ? <ErrorMessage message={error} /> : null}
-
-          <Field label="Email address" htmlFor="forgot-email" required>
-            <TextInput
-              id="forgot-email"
-              type="email"
-              value={email}
-              onChange={event => setEmail(event.target.value)}
-              placeholder="you@example.com"
-              required
-            />
-          </Field>
-
-          <Button type="submit" loading={loading} block>
-            {loading ? 'Sending reset link...' : 'Send reset link'}
-          </Button>
-        </form>
-      )}
-    </AuthShell>
+      <form onSubmit={handleSubmit}>
+        <div style={{ marginBottom: '1.5rem' }}>
+          <label>Email</label>
+          <input
+            type="email"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            required
+            style={{ display: 'block', width: '100%', marginTop: 4 }}
+          />
+        </div>
+        <button type="submit" disabled={loading} style={{ width: '100%' }}>
+          {loading ? 'Sending...' : 'Send reset link'}
+        </button>
+      </form>
+    </div>
   )
 }

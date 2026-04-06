@@ -1,73 +1,71 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import AuthShell from '../../components/layout/AuthShell'
-import Button from '../../components/ui/Button'
-import ErrorMessage from '../../components/ui/ErrorMessage'
-import Field from '../../components/ui/Field'
-import TextInput from '../../components/ui/TextInput'
-import { useAuth } from '../../hooks/useAuth.jsx'
 import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../hooks/useAuth.jsx'
 
 export default function DoctorCompleteProfile() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const [specialization, setSpecialization] = useState('')
   const [licenseNo, setLicenseNo] = useState('')
-  const [error, setError] = useState('')
+  const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
 
-  async function handleSubmit(event) {
-    event.preventDefault()
-    setError('')
+  async function handleSubmit(e) {
+    e.preventDefault()
+    setError(null)
     setLoading(true)
-
     try {
-      const { error: doctorError } = await supabase
+      const { error } = await supabase
         .from('doctors')
         .insert({ id: user.id, specialization, license_no: licenseNo })
-
-      if (doctorError) throw doctorError
+      if (error) throw error
       navigate('/')
-    } catch (saveError) {
-      setError(saveError.message)
+    } catch (err) {
+      setError(err.message)
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <AuthShell
-      eyebrow="Doctor setup"
-      title="Complete your doctor profile"
-      description="Add your clinical credentials so patients can find you and book appointments with confidence."
-    >
-      <form className="space-y-5" onSubmit={handleSubmit}>
-        {error ? <ErrorMessage message={error} /> : null}
+    <div style={{ maxWidth: 400, margin: '80px auto', padding: '0 1rem' }}>
+      <h1 style={{ marginBottom: '0.25rem' }}>Complete your profile</h1>
+      <p style={{ color: 'gray', marginBottom: '2rem' }}>
+        We need a few more details before you can access your dashboard.
+      </p>
 
-        <Field label="Specialization" htmlFor="doctor-specialization" required>
-          <TextInput
-            id="doctor-specialization"
+      {error && <p style={{ color: 'red', marginBottom: '1rem' }}>⚠ {error}</p>}
+
+      <form onSubmit={handleSubmit}>
+        <div style={{ marginBottom: '1rem' }}>
+          <label>Specialization</label>
+          <input
+            type="text"
+            placeholder="e.g. Cardiology, General Practice"
             value={specialization}
-            onChange={event => setSpecialization(event.target.value)}
-            placeholder="e.g. Cardiology"
+            onChange={e => setSpecialization(e.target.value)}
             required
+            style={{ display: 'block', width: '100%', marginTop: 4 }}
           />
-        </Field>
+        </div>
 
-        <Field label="License number" htmlFor="doctor-license" required>
-          <TextInput
-            id="doctor-license"
-            value={licenseNo}
-            onChange={event => setLicenseNo(event.target.value)}
+        <div style={{ marginBottom: '1.5rem' }}>
+          <label>License number</label>
+          <input
+            type="text"
             placeholder="e.g. MCI-12345"
+            value={licenseNo}
+            onChange={e => setLicenseNo(e.target.value)}
             required
+            style={{ display: 'block', width: '100%', marginTop: 4 }}
           />
-        </Field>
+        </div>
 
-        <Button type="submit" loading={loading} block>
-          {loading ? 'Completing setup...' : 'Complete setup'}
-        </Button>
+        <button type="submit" disabled={loading} style={{ width: '100%' }}>
+          {loading ? 'Saving...' : 'Complete setup'}
+        </button>
       </form>
-    </AuthShell>
+    </div>
   )
 }

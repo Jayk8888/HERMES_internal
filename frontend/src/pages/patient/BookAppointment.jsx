@@ -1,21 +1,31 @@
 import { useState } from 'react'
-import { ArrowLeft, ArrowRight, CalendarDays, CalendarPlus2, CheckCircle2, Clock3, Stethoscope } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import PageLayout from '../../components/layout/PageLayout'
-import Button from '../../components/ui/Button'
-import Card from '../../components/ui/Card'
-import EmptyState from '../../components/ui/EmptyState'
-import ErrorMessage from '../../components/ui/ErrorMessage'
-import InlineAlert from '../../components/ui/InlineAlert'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
-import SectionHeader from '../../components/ui/SectionHeader'
+import ErrorMessage from '../../components/ui/ErrorMessage'
 import { useFetch } from '../../hooks/useFetch'
 import { useAuth } from '../../hooks/useAuth'
-import { cn } from '../../lib/cn'
-import { getProfileName } from '../../lib/data'
-import { DAYS_JS, MONTH_NAMES } from '../../lib/constants'
-import { formatTime } from '../../lib/formatters'
 import { supabase } from '../../lib/supabase'
+
+const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+const DAYS_JS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December']
+
+function formatTime(time) {
+  if (!time) return ''
+  const [h, m] = time.split(':')
+  const hour = parseInt(h)
+  const ampm = hour >= 12 ? 'PM' : 'AM'
+  const display = hour % 12 === 0 ? 12 : hour % 12
+  return `${display}:${m} ${ampm}`
+}
+
+function getProfileName(profiles) {
+  if (!profiles) return 'Unknown'
+  if (Array.isArray(profiles)) return profiles[0]?.full_name ?? 'Unknown'
+  return profiles.full_name ?? 'Unknown'
+}
 
 function toDateStr(year, month, day) {
   return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
@@ -25,72 +35,50 @@ function CalendarPicker({ availability, existingAppointments, selectedDate, onSe
   const today = new Date()
   const [viewYear, setViewYear] = useState(today.getFullYear())
   const [viewMonth, setViewMonth] = useState(today.getMonth())
-  const availableDays = new Set((availability || []).map(slot => slot.day))
+
+  const availableDays = new Set((availability || []).map(s => s.day))
+
   const firstDay = new Date(viewYear, viewMonth, 1).getDay()
   const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate()
 
   const bookedDates = new Set(
-    (existingAppointments || []).map(appointment => {
-      const date = new Date(appointment.scheduled_at)
-      return toDateStr(date.getFullYear(), date.getMonth(), date.getDate())
+    (existingAppointments || []).map(a => {
+      const d = new Date(a.scheduled_at)
+      return toDateStr(d.getFullYear(), d.getMonth(), d.getDate())
     })
   )
 
-  function previousMonth() {
-    if (viewMonth === 0) {
-      setViewYear(year => year - 1)
-      setViewMonth(11)
-      return
-    }
-
-    setViewMonth(month => month - 1)
+  function prevMonth() {
+    if (viewMonth === 0) { setViewYear(y => y - 1); setViewMonth(11) }
+    else setViewMonth(m => m - 1)
   }
 
   function nextMonth() {
-    if (viewMonth === 11) {
-      setViewYear(year => year + 1)
-      setViewMonth(0)
-      return
-    }
-
-    setViewMonth(month => month + 1)
+    if (viewMonth === 11) { setViewYear(y => y + 1); setViewMonth(0) }
+    else setViewMonth(m => m + 1)
   }
 
   const cells = []
-  for (let index = 0; index < firstDay; index += 1) cells.push(null)
-  for (let day = 1; day <= daysInMonth; day += 1) cells.push(day)
+  for (let i = 0; i < firstDay; i++) cells.push(null)
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d)
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <button
-          type="button"
-          onClick={previousMonth}
-          className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </button>
-        <p className="font-semibold text-slate-900">
-          {MONTH_NAMES[viewMonth]} {viewYear}
-        </p>
-        <button
-          type="button"
-          onClick={nextMonth}
-          className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900"
-        >
-          <ArrowRight className="h-4 w-4" />
-        </button>
+    <div style={{ userSelect: 'none' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+        <button type="button" onClick={prevMonth} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: '#0369a1' }}>‹</button>
+        <span style={{ fontWeight: 600, fontSize: 15 }}>{MONTH_NAMES[viewMonth]} {viewYear}</span>
+        <button type="button" onClick={nextMonth} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: '#0369a1' }}>›</button>
       </div>
 
-      <div className="grid grid-cols-7 gap-2 text-center text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-        {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(day => (
-          <div key={day} className="py-2">{day}</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, marginBottom: 4 }}>
+        {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(d => (
+          <div key={d} style={{ textAlign: 'center', fontSize: 12, color: 'gray', fontWeight: 500, padding: '4px 0' }}>{d}</div>
         ))}
       </div>
 
-      <div className="grid grid-cols-7 gap-2">
-        {cells.map((day, index) => {
-          if (!day) return <div key={`empty-${index}`} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+        {cells.map((day, i) => {
+          if (!day) return <div key={`empty-${i}`} />
 
           const dateStr = toDateStr(viewYear, viewMonth, day)
           const jsDay = new Date(viewYear, viewMonth, day).getDay()
@@ -103,36 +91,47 @@ function CalendarPicker({ availability, existingAppointments, selectedDate, onSe
           const isSelectable = isAvailable && !isPast && !isBooked
 
           return (
-            <button
+            <div
               key={day}
-              type="button"
               onClick={() => isSelectable && onSelect(dateStr)}
-              disabled={!isSelectable}
-              className={cn(
-                'rounded-2xl border px-2 py-3 text-sm font-medium transition-colors',
-                isSelected && 'border-primary-600 bg-primary-600 text-white',
-                !isSelected && isSelectable && 'border-primary-100 bg-primary-50 text-primary-800 hover:border-primary-300',
-                !isSelected && !isSelectable && 'border-slate-100 bg-slate-50 text-slate-300',
-                isToday && !isSelected && 'ring-2 ring-primary-200'
-              )}
+              style={{
+                textAlign: 'center',
+                padding: '8px 4px',
+                borderRadius: 8,
+                fontSize: 14,
+                cursor: isSelectable ? 'pointer' : 'default',
+                fontWeight: isToday ? 700 : 400,
+                background: isSelected
+                  ? '#0369a1'
+                  : isAvailable && !isPast && !isBooked
+                    ? '#e0f2fe'
+                    : 'transparent',
+                color: isSelected
+                  ? 'white'
+                  : isPast || !isAvailable || isBooked
+                    ? '#d1d5db'
+                    : '#0369a1',
+                border: isToday && !isSelected ? '1px solid #0369a1' : '1px solid transparent',
+                transition: 'all 0.15s'
+              }}
             >
               {day}
-            </button>
+            </div>
           )
         })}
       </div>
 
-      <div className="flex flex-wrap gap-3 text-xs text-slate-500">
-        <span className="inline-flex items-center gap-2">
-          <span className="h-3 w-3 rounded bg-primary-50" />
+      <div style={{ display: 'flex', gap: '1rem', marginTop: '0.75rem', fontSize: 12, color: 'gray' }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ width: 12, height: 12, borderRadius: 3, background: '#e0f2fe', display: 'inline-block' }} />
           Available
         </span>
-        <span className="inline-flex items-center gap-2">
-          <span className="h-3 w-3 rounded bg-primary-600" />
+        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ width: 12, height: 12, borderRadius: 3, background: '#0369a1', display: 'inline-block' }} />
           Selected
         </span>
-        <span className="inline-flex items-center gap-2">
-          <span className="h-3 w-3 rounded bg-slate-100" />
+        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ width: 12, height: 12, borderRadius: 3, background: '#f3f4f6', display: 'inline-block' }} />
           Unavailable
         </span>
       </div>
@@ -148,356 +147,202 @@ export default function PatientBookAppointment() {
   const [selectedSlot, setSelectedSlot] = useState(null)
   const [bookedAppointment, setBookedAppointment] = useState(null)
   const [isBooking, setIsBooking] = useState(false)
-  const [bookingError, setBookingError] = useState('')
+  const [bookingError, setBookingError] = useState(null)
 
   const { data: doctors, loading, error, refetch } = useFetch(async () => {
-    const { data, error: doctorsError } = await supabase
+    const { data, error } = await supabase
       .from('doctors')
-      .select('id, specialization, license_no, profiles (full_name, email)')
-
-    if (doctorsError) throw doctorsError
-
-    return (data || []).sort((first, second) =>
-      getProfileName(first.profiles).localeCompare(getProfileName(second.profiles))
+      .select(`id, specialization, license_no, profiles (full_name, email)`)
+    if (error) throw error
+    return (data || []).sort((a, b) =>
+      getProfileName(a.profiles).localeCompare(getProfileName(b.profiles))
     )
-  }, [], { key: 'book-appointment-doctors' })
+  })
 
   const { data: availability, loading: availabilityLoading } = useFetch(async () => {
     if (!selectedDoctor) return []
-
-    const { data, error: availabilityError } = await supabase
+    const { data, error } = await supabase
       .from('availability')
       .select('*')
       .eq('doctor_id', selectedDoctor)
-
-    if (availabilityError) throw availabilityError
+    if (error) throw error
     return data || []
-  }, [selectedDoctor], {
-    key: `book-appointment-availability:${selectedDoctor ?? 'none'}`,
-    enabled: Boolean(selectedDoctor),
-  })
+  }, [selectedDoctor])
 
   const { data: existingAppointments } = useFetch(async () => {
     if (!selectedDoctor) return []
-
-    const { data, error: appointmentsError } = await supabase
+    const { data, error } = await supabase
       .from('appointments')
       .select('scheduled_at')
       .eq('doctor_id', selectedDoctor)
       .eq('status', 'scheduled')
-
-    if (appointmentsError) throw appointmentsError
+    if (error) throw error
     return data || []
-  }, [selectedDoctor], {
-    key: `book-appointment-existing:${selectedDoctor ?? 'none'}`,
-    enabled: Boolean(selectedDoctor),
-  })
+  }, [selectedDoctor])
 
-  const selectedDoctorRecord = doctors?.find(doctor => doctor.id === selectedDoctor) ?? null
   const selectedDayName = selectedDate ? DAYS_JS[new Date(selectedDate).getDay()] : null
-  const slotsForDay = availability ? availability.filter(slot => slot.day === selectedDayName) : []
+  const slotsForDay = availability
+    ? availability.filter(s => s.day === selectedDayName)
+    : []
 
   function isSlotBooked(slot, dateStr) {
     if (!existingAppointments || !dateStr) return false
-
-    return existingAppointments.some(appointment => {
-      const date = new Date(appointment.scheduled_at)
-      const appointmentDate = toDateStr(date.getFullYear(), date.getMonth(), date.getDate())
-      const appointmentTime = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
-      return appointmentDate === dateStr && appointmentTime >= slot.start_time && appointmentTime < slot.end_time
+    return existingAppointments.some(appt => {
+      const d = new Date(appt.scheduled_at)
+      const apptDate = toDateStr(d.getFullYear(), d.getMonth(), d.getDate())
+      const apptTime = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+      return apptDate === dateStr && apptTime >= slot.start_time && apptTime < slot.end_time
     })
   }
 
   async function handleBookAppointment() {
     if (!user?.id || !selectedDoctor || !selectedDate || !selectedSlot) {
-      setBookingError('Please select a doctor, date, and time slot.')
+      setBookingError('Please select a doctor, date and time slot')
       return
     }
 
     setIsBooking(true)
-    setBookingError('')
+    setBookingError(null)
 
     try {
-      const [startHour, startMinute] = selectedSlot.start_time.split(':')
+      const [startH, startM] = selectedSlot.start_time.split(':')
       const appointmentDate = new Date(selectedDate)
-      appointmentDate.setHours(Number(startHour), Number(startMinute), 0, 0)
+      appointmentDate.setHours(parseInt(startH), parseInt(startM), 0, 0)
 
-      const { data, error: bookingRpcError } = await supabase
-        .rpc('book_appointment', {
-          p_doctor_id: selectedDoctor,
-          p_scheduled_at: appointmentDate.toISOString(),
-        })
+      const { data, error } = await supabase
+        .from('appointments')
+        .insert([{
+          patient_id: user.id,
+          doctor_id: selectedDoctor,
+          scheduled_at: appointmentDate.toISOString(),
+          status: 'scheduled'
+        }])
+        .select()
 
-      if (bookingRpcError) throw bookingRpcError
+      if (error) throw error
 
-      setBookedAppointment(data ?? null)
+      setBookedAppointment(data?.[0])
       setSelectedDoctor(null)
       setSelectedDate('')
       setSelectedSlot(null)
-    } catch (requestError) {
-      const message = requestError.message || 'Failed to book appointment'
-      setBookingError(
-        message.includes('row-level security policy')
-          ? 'Your account is not allowed to book appointments yet. Complete your patient profile and sign in again.'
-          : message
-      )
+    } catch (err) {
+      setBookingError(err.message || 'Failed to book appointment')
     } finally {
       setIsBooking(false)
     }
   }
 
-  if (authLoading) {
-    return (
-      <PageLayout>
-        <LoadingSpinner message="Loading booking workspace..." />
-      </PageLayout>
-    )
-  }
+  if (authLoading) return <PageLayout><LoadingSpinner /></PageLayout>
 
   return (
-    <PageLayout width="wide">
-      <div className="space-y-6">
-        <SectionHeader
-          title="Book an appointment"
-          description="Choose a doctor, review availability, and confirm a time slot in a guided clinical booking flow."
-        />
+    <PageLayout>
+      <div style={{ maxWidth: 800 }}>
+        <div style={{ marginBottom: '2rem' }}>
+          <h1 style={{ marginBottom: '0.5rem' }}>Book an Appointment</h1>
+          <p style={{ color: 'gray' }}>Select a doctor and available time slot</p>
+        </div>
 
-        {bookedAppointment ? (
-          <InlineAlert
-            tone="success"
-            title="Appointment booked successfully"
-            message="Your appointment has been scheduled and is now visible in your appointment list."
-            actions={(
-              <Button onClick={() => navigate('/patient/appointments')}>
-                View your appointments
-              </Button>
-            )}
-          />
-        ) : null}
-
-        <div className="grid gap-6 xl:grid-cols-[1.55fr_0.85fr]">
-          <div className="space-y-6">
-            <Card className="space-y-5">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                  Step 1
-                </p>
-                <h3 className="mt-2 text-xl font-semibold text-slate-900">Select a doctor</h3>
-                <p className="mt-2 text-sm leading-relaxed text-slate-500">
-                  Choose a doctor to see appointment availability and eligible booking dates.
-                </p>
-              </div>
-
-              {loading ? <LoadingSpinner message="Loading doctors..." /> : null}
-              {error ? <ErrorMessage message={error} onRetry={refetch} /> : null}
-
-              {!loading && !error && doctors?.length === 0 ? (
-                <EmptyState
-                  icon={<Stethoscope className="h-5 w-5" />}
-                  title="No doctors available"
-                  description="Doctors appear here once their profiles have been completed."
-                />
-              ) : null}
-
-              {!loading && !error && doctors?.length > 0 ? (
-                <div className="grid gap-3">
-                  {doctors.map(doctor => (
-                    <button
-                      key={doctor.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedDoctor(doctor.id)
-                        setSelectedDate('')
-                        setSelectedSlot(null)
-                        setBookingError('')
-                      }}
-                      className={cn(
-                        'rounded-3xl border px-5 py-4 text-left transition-colors',
-                        selectedDoctor === doctor.id
-                          ? 'border-primary-400 bg-primary-50'
-                          : 'border-slate-200 bg-white hover:border-primary-200 hover:bg-slate-50'
-                      )}
-                    >
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                          <p className="text-lg font-semibold text-slate-900">
-                            Dr. {getProfileName(doctor.profiles)}
-                          </p>
-                          <p className="mt-1 text-sm text-slate-500">{doctor.specialization}</p>
-                        </div>
-                        <div className="space-y-1 text-sm text-slate-500 sm:text-right">
-                          <p>{doctor.profiles?.email || 'No email available'}</p>
-                          <p>License: {doctor.license_no}</p>
-                        </div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-            </Card>
-
-            <Card className="space-y-5">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                  Step 2
-                </p>
-                <h3 className="mt-2 text-xl font-semibold text-slate-900">Select date and time</h3>
-                <p className="mt-2 text-sm leading-relaxed text-slate-500">
-                  Availability is derived from the selected doctor’s weekly schedule.
-                </p>
-              </div>
-
-              {!selectedDoctor ? (
-                <EmptyState
-                  icon={<CalendarDays className="h-5 w-5" />}
-                  title="Choose a doctor first"
-                  description="Select a doctor in step 1 to unlock the calendar and available slots."
-                />
-              ) : availabilityLoading ? (
-                <LoadingSpinner message="Loading availability..." />
-              ) : (availability || []).length === 0 ? (
-                <EmptyState
-                  icon={<Clock3 className="h-5 w-5" />}
-                  title="No availability set yet"
-                  description="This doctor has not added weekly availability yet. Try a different doctor or check back later."
-                />
-              ) : (
-                <div className="space-y-5">
-                  <CalendarPicker
-                    availability={availability}
-                    existingAppointments={existingAppointments}
-                    selectedDate={selectedDate}
-                    onSelect={date => {
-                      setSelectedDate(date)
-                      setSelectedSlot(null)
-                    }}
-                  />
-
-                  {selectedDate ? (
-                    <div className="space-y-3">
-                      <div>
-                        <p className="text-sm font-semibold text-slate-900">
-                          Available slots for{' '}
-                          {new Date(selectedDate).toLocaleDateString('en-IN', {
-                            weekday: 'long',
-                            day: 'numeric',
-                            month: 'long',
-                          })}
-                        </p>
-                        <p className="text-sm text-slate-500">
-                          Unavailable slots are already booked for this doctor.
-                        </p>
-                      </div>
-
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        {slotsForDay.map(slot => {
-                          const booked = isSlotBooked(slot, selectedDate)
-
-                          return (
-                            <button
-                              key={slot.id}
-                              type="button"
-                              disabled={booked}
-                              onClick={() => setSelectedSlot(slot)}
-                              className={cn(
-                                'rounded-2xl border px-4 py-3 text-left text-sm transition-colors',
-                                booked && 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300',
-                                !booked && selectedSlot?.id === slot.id && 'border-primary-500 bg-primary-600 text-white',
-                                !booked && selectedSlot?.id !== slot.id && 'border-slate-200 bg-white text-slate-700 hover:border-primary-200 hover:bg-primary-50'
-                              )}
-                            >
-                              <p className="font-semibold">
-                                {formatTime(slot.start_time)} to {formatTime(slot.end_time)}
-                              </p>
-                              <p className={cn('mt-1 text-xs', booked ? 'text-slate-300' : selectedSlot?.id === slot.id ? 'text-primary-50' : 'text-slate-400')}>
-                                {booked ? 'Unavailable' : 'Available'}
-                              </p>
-                            </button>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-              )}
-            </Card>
+        {bookedAppointment && (
+          <div style={{ padding: '1.25rem', borderRadius: 12, background: '#dcfce7', border: '1px solid #86efac', marginBottom: '2rem' }}>
+            <p style={{ color: '#15803d', fontWeight: 500, marginBottom: '0.5rem' }}>✓ Appointment booked successfully!</p>
+            <p style={{ color: '#15803d', fontSize: 14, marginBottom: '1rem' }}>Your appointment has been scheduled.</p>
+            <button onClick={() => navigate('/patient/appointments')} style={{ padding: '0.5rem 1rem', borderRadius: 8, border: 'none', background: '#15803d', color: 'white', cursor: 'pointer', fontSize: 14 }}>
+              View Your Appointments
+            </button>
           </div>
+        )}
 
-          <Card tone="brand" className="h-fit xl:sticky xl:top-24">
-            <div className="space-y-5">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary-50/70">
-                  Booking summary
-                </p>
-                <h3 className="mt-2 font-display text-2xl font-semibold text-white">
-                  Confirm your appointment
-                </h3>
-              </div>
-
-              <div className="space-y-3 rounded-[28px] border border-white/10 bg-white/10 p-5 text-sm text-primary-50/80">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary-50/60">
-                    Doctor
-                  </p>
-                  <p className="mt-1 font-semibold text-white">
-                    {selectedDoctorRecord ? `Dr. ${getProfileName(selectedDoctorRecord.profiles)}` : 'Choose a doctor'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary-50/60">
-                    Specialization
-                  </p>
-                  <p className="mt-1 font-semibold text-white">
-                    {selectedDoctorRecord?.specialization || 'Select a doctor first'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary-50/60">
-                    Date
-                  </p>
-                  <p className="mt-1 font-semibold text-white">
-                    {selectedDate ? new Date(selectedDate).toLocaleDateString('en-IN', { dateStyle: 'medium' }) : 'Choose a date'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary-50/60">
-                    Time slot
-                  </p>
-                  <p className="mt-1 font-semibold text-white">
-                    {selectedSlot ? `${formatTime(selectedSlot.start_time)} to ${formatTime(selectedSlot.end_time)}` : 'Choose a slot'}
-                  </p>
-                </div>
-              </div>
-
-              {bookingError ? <ErrorMessage message={bookingError} /> : null}
-
-              <div className="space-y-3">
-                <Button
-                  block
-                  loading={isBooking}
-                  onClick={handleBookAppointment}
-                  disabled={!selectedDoctor || !selectedDate || !selectedSlot || isBooking}
-                  className="bg-white text-primary-800 hover:bg-primary-50"
-                >
-                  {isBooking ? 'Booking...' : 'Confirm appointment'}
-                </Button>
-                <Button
-                  block
-                  variant="secondary"
-                  className="border-white/20 bg-white/10 text-white hover:bg-white/15"
-                  onClick={() => {
-                    setSelectedDoctor(null)
-                    setSelectedDate('')
-                    setSelectedSlot(null)
-                    setBookingError('')
+        {/* Step 1 */}
+        <div style={{ padding: '1.5rem', borderRadius: 12, border: '1px solid #e5e7eb', marginBottom: '1.5rem', background: 'white' }}>
+          <h2 style={{ marginBottom: '1rem', fontSize: 16, fontWeight: 600 }}>Step 1: Select a Doctor</h2>
+          {loading && <LoadingSpinner />}
+          {error && <ErrorMessage message={error} onRetry={refetch} />}
+          {!loading && !error && doctors && (
+            <div style={{ display: 'grid', gap: '0.75rem', maxHeight: 400, overflowY: 'auto' }}>
+              {doctors.map(doctor => (
+                <div
+                  key={doctor.id}
+                  onClick={() => { setSelectedDoctor(doctor.id); setSelectedDate(''); setSelectedSlot(null) }}
+                  style={{
+                    padding: '1rem', borderRadius: 8, cursor: 'pointer', transition: 'all 0.2s',
+                    border: selectedDoctor === doctor.id ? '2px solid #0369a1' : '1px solid #e5e7eb',
+                    background: selectedDoctor === doctor.id ? '#f0f9ff' : 'white'
                   }}
                 >
-                  Reset selection
-                </Button>
-              </div>
+                  <p style={{ fontWeight: 600, marginBottom: '0.25rem' }}>Dr. {getProfileName(doctor.profiles)}</p>
+                  <p style={{ fontSize: 14, color: 'gray', marginBottom: '0.25rem' }}>{doctor.specialization}</p>
+                  <p style={{ fontSize: 12, color: '#666' }}>License: {doctor.license_no}</p>
+                </div>
+              ))}
             </div>
-          </Card>
+          )}
         </div>
+
+        {/* Step 2 */}
+        {selectedDoctor && (
+          <div style={{ padding: '1.5rem', borderRadius: 12, border: '1px solid #e5e7eb', marginBottom: '1.5rem', background: 'white' }}>
+            <h2 style={{ marginBottom: '1rem', fontSize: 16, fontWeight: 600 }}>Step 2: Select Date & Time</h2>
+            {availabilityLoading ? <LoadingSpinner /> : (availability || []).length === 0 ? (
+              <p style={{ color: 'gray' }}>This doctor has no availability set yet.</p>
+            ) : (
+              <div style={{ display: 'grid', gap: '1.25rem' }}>
+                <CalendarPicker
+                  availability={availability}
+                  existingAppointments={existingAppointments}
+                  selectedDate={selectedDate}
+                  onSelect={date => { setSelectedDate(date); setSelectedSlot(null) }}
+                />
+
+                {selectedDate && (
+                  <div>
+                    <label style={{ display: 'block', fontWeight: 500, marginBottom: '0.5rem', fontSize: 14 }}>
+                      Select Time Slot for {new Date(selectedDate).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
+                    </label>
+                    <select
+                      value={selectedSlot ? JSON.stringify(selectedSlot) : ''}
+                      onChange={e => setSelectedSlot(e.target.value ? JSON.parse(e.target.value) : null)}
+                      style={{ width: '100%', padding: '0.6rem 0.75rem', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, fontFamily: 'inherit', background: 'white' }}
+                    >
+                      <option value="">Choose a time slot...</option>
+                      {slotsForDay.map(slot => {
+                        const booked = isSlotBooked(slot, selectedDate)
+                        return (
+                          <option key={slot.id} value={JSON.stringify(slot)} disabled={booked}>
+                            {formatTime(slot.start_time)} — {formatTime(slot.end_time)}{booked ? ' (unavailable)' : ''}
+                          </option>
+                        )
+                      })}
+                    </select>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {bookingError && (
+          <div style={{ padding: '1rem', borderRadius: 8, background: '#fee2e2', border: '1px solid #fca5a5', color: '#b91c1c', marginBottom: '1rem' }}>
+            {bookingError}
+          </div>
+        )}
+
+        {selectedDoctor && selectedDate && selectedSlot && !bookedAppointment && (
+          <div style={{ display: 'flex', gap: '1rem' }}>
+            <button
+              onClick={handleBookAppointment}
+              disabled={isBooking}
+              style={{ flex: 1, padding: '0.75rem', borderRadius: 8, border: 'none', background: '#0369a1', color: 'white', cursor: isBooking ? 'not-allowed' : 'pointer', fontWeight: 600, opacity: isBooking ? 0.6 : 1 }}
+            >
+              {isBooking ? 'Booking...' : 'Confirm Appointment'}
+            </button>
+            <button
+              onClick={() => { setSelectedDoctor(null); setSelectedDate(''); setSelectedSlot(null); setBookingError(null) }}
+              style={{ flex: 1, padding: '0.75rem', borderRadius: 8, border: '1px solid #e5e7eb', background: 'white', cursor: 'pointer', fontWeight: 600 }}
+            >
+              Cancel
+            </button>
+          </div>
+        )}
       </div>
     </PageLayout>
   )

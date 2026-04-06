@@ -309,8 +309,8 @@ export default function PatientBookAppointment() {
                         setSelectedDoctor(doctor.id)
                         setSelectedDate('')
                         setSelectedSlot(null)
-                        setBookingError('')
-                      }}
+      const appointmentDate = new Date(`${selectedDate}T00:00:00`)
+      appointmentDate.setHours(Number(startHour), Number(startMinute), 0, 0)
                       className={cn(
                         'rounded-3xl border px-5 py-4 text-left transition-colors',
                         selectedDoctor === doctor.id

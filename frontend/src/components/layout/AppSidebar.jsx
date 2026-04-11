@@ -10,6 +10,7 @@ import {
   UserRound,
   Users,
   X,
+  Shield,
 } from 'lucide-react'
 import { signOut } from '../../features/auth/authService'
 import { cn } from '../../lib/cn'
@@ -25,6 +26,7 @@ const ICONS = {
   user: UserRound,
   users: Users,
   clock: Clock3,
+  shield: Shield,
 }
 
 function matchesPath(pathname, path) {
@@ -70,7 +72,7 @@ export default function AppSidebar({ role, mobile = false, onClose }) {
     >
       <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-5">
         <Link
-          to={role === 'doctor' ? '/doctor' : '/patient'}
+          to={role === 'doctor' ? '/doctor' : role === 'admin' ? '/admin' : '/patient'}
           className="flex items-center gap-3 text-sidebar-textActive no-underline"
           onClick={() => onClose?.()}
         >

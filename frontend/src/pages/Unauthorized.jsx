@@ -14,6 +14,12 @@ export default function Unauthorized() {
     navigate('/login')
   }
 
+  const homePath = profile?.role === 'doctor'
+    ? '/doctor'
+    : profile?.role === 'admin'
+      ? '/admin'
+      : '/patient'
+
   return (
     <AuthShell
       eyebrow="Access control"
@@ -33,7 +39,7 @@ export default function Unauthorized() {
           You can return to the correct dashboard for your active role or sign out and authenticate with a different account.
         </p>
         <div className="flex flex-col gap-3 sm:flex-row">
-          <Button as={Link} to={profile?.role === 'doctor' ? '/doctor' : '/patient'}>
+          <Button as={Link} to={homePath}>
             Go to my dashboard
           </Button>
           <Button variant="secondary" onClick={handleLogout}>

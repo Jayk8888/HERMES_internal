@@ -100,5 +100,9 @@ export default function Home() {
     return <Navigate to="/patient" replace />
   }
 
+  if (profile?.role === 'admin') {
+    return <Navigate to="/admin" replace />
+  }
+
   return <Navigate to="/patient" replace />
 }

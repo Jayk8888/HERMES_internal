@@ -19,7 +19,7 @@ export default function PageLayout({
 }) {
   const { profile } = useAuth()
   const [mobileOpen, setMobileOpen] = useState(false)
-  const role = profile?.role === 'doctor' ? 'doctor' : 'patient'
+  const role = profile?.role === 'doctor' || profile?.role === 'admin' ? profile.role : 'patient'
 
   return (
     <div className="h-screen overflow-hidden bg-canvas">

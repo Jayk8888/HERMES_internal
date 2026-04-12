@@ -165,7 +165,7 @@ export default function AdminAppointments() {
               render: row => (
                 row.hasRecord
                   ? <Button as={Link} to={`/admin/records/${row.recordId}`} variant="secondary" size="small">Open</Button>
-                  : <AdminStatusCell tone="warning">Missing</AdminStatusCell>
+                  : <Button as={Link} to={`/admin/records?appointmentId=${row.id}`} size="small">Create record</Button>
               ),
             },
           ]}

@@ -47,8 +47,9 @@ export function useFetch(fn, deps = [], options = {}) {
     const requestId = requestIdRef.current + 1
     requestIdRef.current = requestId
     const cachedEntry = getCachedEntry(key)
+    const usingStaleEntry = !force && cachedEntry && staleWhileRevalidate
 
-    if (!force && cachedEntry && staleWhileRevalidate) {
+    if (usingStaleEntry) {
       setData(cachedEntry.data ?? null)
       setError(cachedEntry.error ?? null)
       setLoading(!isFresh(cachedEntry, ttl))
@@ -62,7 +63,9 @@ export function useFetch(fn, deps = [], options = {}) {
     }
 
     setLoading(true)
-    setError(null)
+    if (!usingStaleEntry) {
+      setError(null)
+    }
 
     try {
       const result = await fn()
@@ -88,8 +91,7 @@ export function useFetch(fn, deps = [], options = {}) {
         error: error.message,
         timestamp: Date.now(),
       })
-
-      throw error
+      return cachedEntry?.data ?? null
     } finally {
       if (requestIdRef.current === requestId) {
         setLoading(false)

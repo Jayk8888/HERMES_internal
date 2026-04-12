@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 function readSessionValue(key, initialValue) {
   if (typeof window === 'undefined') {
@@ -15,9 +15,15 @@ function readSessionValue(key, initialValue) {
 
 export function useSessionState(key, initialValue) {
   const [value, setValue] = useState(() => readSessionValue(key, initialValue))
+  const skipNextWriteRef = useRef(false)
 
   useEffect(() => {
     if (typeof window === 'undefined') return
+
+    if (skipNextWriteRef.current) {
+      skipNextWriteRef.current = false
+      return
+    }
 
     try {
       window.sessionStorage.setItem(key, JSON.stringify(value))
@@ -27,6 +33,7 @@ export function useSessionState(key, initialValue) {
   }, [key, value])
 
   function clearValue(nextValue = initialValue) {
+    skipNextWriteRef.current = true
     setValue(nextValue)
 
     if (typeof window === 'undefined') return

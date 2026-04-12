@@ -1,5 +1,5 @@
 import React from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import PageLayout from '../../components/layout/PageLayout'
 import Button from '../../components/ui/Button'
 import Field from '../../components/ui/Field'
@@ -25,6 +25,7 @@ const EMPTY_RECORD_DRAFT = {
 }
 
 export default function AdminRecords() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const recordsFetch = useFetch(loadAdminRecords, [], {
     key: 'admin:records',
   })
@@ -35,6 +36,27 @@ export default function AdminRecords() {
   const [errors, setErrors] = React.useState({})
   const [saving, setSaving] = React.useState(false)
   const [message, setMessage] = React.useState(null)
+  const queue = buildRecordQueue(appointmentsFetch.data ?? [])
+  const queueOptions = queue.map(item => ({
+    value: item.id,
+    label: `${item.patientName} · ${item.doctorName} · ${item.scheduledLabel}`,
+  }))
+  const requestedAppointmentId = searchParams.get('appointmentId')
+
+  React.useEffect(() => {
+    if (!requestedAppointmentId) return
+    if (!queue.some(item => item.id === requestedAppointmentId)) return
+
+    setDraft(current => (
+      current.appointmentId === requestedAppointmentId
+        ? current
+        : { ...current, appointmentId: requestedAppointmentId }
+    ))
+
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.delete('appointmentId')
+    setSearchParams(nextParams, { replace: true })
+  }, [queue, requestedAppointmentId, searchParams, setDraft, setSearchParams])
 
   if (recordsFetch.loading || appointmentsFetch.loading) {
     return <PageLayout width="wide"><AdminRecordsSkeleton /></PageLayout>
@@ -46,12 +68,6 @@ export default function AdminRecords() {
       void appointmentsFetch.refetch()
     }} /></PageLayout>
   }
-
-  const queue = buildRecordQueue(appointmentsFetch.data)
-  const queueOptions = queue.map(item => ({
-    value: item.id,
-    label: `${item.patientName} · ${item.doctorName} · ${item.scheduledLabel}`,
-  }))
 
   async function handleSave(event) {
     event.preventDefault()

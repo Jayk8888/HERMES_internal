@@ -72,7 +72,7 @@ export default function AdminAppointmentDetail() {
       width="wide"
       actions={data.hasRecord
         ? <Button as={Link} to={`/admin/records/${data.recordId}`} size="small" variant="secondary">Open record</Button>
-        : <Button as={Link} to="/admin/records" size="small">Create record</Button>}
+        : <Button as={Link} to={`/admin/records?appointmentId=${data.id}`} size="small">Create record</Button>}
     >
       <form className="space-y-6" onSubmit={handleSave}>
         {message ? <InlineAlert tone={message.tone} message={message.text} /> : null}
@@ -102,7 +102,7 @@ export default function AdminAppointmentDetail() {
           {data.hasRecord ? (
             <Button as={Link} to={`/admin/records/${data.recordId}`} variant="secondary">Open record</Button>
           ) : (
-            <Button as={Link} to="/admin/records">Go to needs-record queue</Button>
+            <Button as={Link} to={`/admin/records?appointmentId=${data.id}`}>Create record</Button>
           )}
         </AdminSection>
 

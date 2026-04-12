@@ -5,7 +5,9 @@ import { AdminDashboardSkeleton, AdminErrorState } from './components/AdminPageS
 import { loadAdminDashboard } from './lib/loaders'
 
 export default function AdminDashboard() {
-  const { data, loading, error, refetch } = useFetch(loadAdminDashboard, [])
+  const { data, loading, error, refetch } = useFetch(loadAdminDashboard, [], {
+    key: 'admin:dashboard',
+  })
 
   if (loading) {
     return (
@@ -26,29 +28,8 @@ export default function AdminDashboard() {
   return (
     <PageLayout
       width="wide"
-      // actions={(
-      //   <>
-      //     <Button as={Link} to="/admin/users" variant="secondary" size="small">Users</Button>
-      //     <Button as={Link} to="/admin/appointments" variant="secondary" size="small">Appointments</Button>
-      //     <Button as={Link} to="/admin/records" variant="secondary" size="small">Records</Button>
-      //     <Button as={Link} to="/admin/availability" size="small">Availability</Button>
-      //   </>
-      // )}
     >
       <div className="space-y-6">
-        {/* <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-          <MetricCard label="Patients" value={metrics.patientCount} icon={<Users className="h-5 w-5" />} />
-          <MetricCard label="Doctors" value={metrics.doctorCount} icon={<Stethoscope className="h-5 w-5" />} />
-          <MetricCard label="Admins" value={metrics.adminCount} icon={<UserRound className="h-5 w-5" />} />
-          <MetricCard label="Today appts" value={metrics.todayAppointments} icon={<CalendarDays className="h-5 w-5" />} />
-          <MetricCard label="Total records" value={metrics.totalRecords} icon={<ClipboardList className="h-5 w-5" />} />
-          <MetricCard label="Completed" value={metrics.completedAppointments} tone="success" />
-          <MetricCard label="Cancelled" value={metrics.cancelledAppointments} tone="warning" />
-          <MetricCard label="Missing records" value={metrics.missingRecords} tone="warning" />
-          <MetricCard label="No availability" value={metrics.doctorsWithoutAvailability} tone="warning" />
-          <MetricCard label="Broken links" value={metrics.brokenLinks} tone="critical" icon={<ShieldAlert className="h-5 w-5" />} />
-        </section> */}
-
         <section className="grid gap-6 xl:grid-cols-3">
           <AdminQueueList
             title="Upcoming appointments"

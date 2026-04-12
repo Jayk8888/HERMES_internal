@@ -6,7 +6,7 @@ import Field from '../../components/ui/Field'
 import InlineAlert from '../../components/ui/InlineAlert'
 import Textarea from '../../components/ui/Textarea'
 import TextInput from '../../components/ui/TextInput'
-import { useFetch } from '../../hooks/useFetch'
+import { invalidateFetchCache, useFetch } from '../../hooks/useFetch'
 import AdminSection from './components/AdminSection'
 import { AdminEmptyState, AdminErrorState, AdminRecordDetailSkeleton } from './components/AdminPageState'
 import { loadAdminRecordDetail, saveAdminMedicalRecord } from './lib/loaders'
@@ -14,7 +14,9 @@ import { validateMedicalRecordForm } from './lib/validators'
 
 export default function AdminRecordDetail() {
   const { id } = useParams()
-  const { data, loading, error, refetch } = useFetch(() => loadAdminRecordDetail(id), [id])
+  const { data, loading, error, refetch } = useFetch(() => loadAdminRecordDetail(id), [id], {
+    key: `admin:record:${id}`,
+  })
   const [draft, setDraft] = React.useState({ appointmentId: '', description: '', prescription: '', vitalsText: '' })
   const [errors, setErrors] = React.useState({})
   const [saving, setSaving] = React.useState(false)
@@ -47,6 +49,10 @@ export default function AdminRecordDetail() {
         p_prescription: draft.prescription || null,
         p_vitals: draft.vitalsText ? JSON.parse(draft.vitalsText) : null,
       })
+      invalidateFetchCache('admin:records')
+      invalidateFetchCache(`admin:record:${data.id}`)
+      invalidateFetchCache('admin:appointments')
+      invalidateFetchCache('admin:dashboard')
       setMessage({ tone: 'success', text: 'Record updated' })
       await refetch()
     } catch (saveError) {

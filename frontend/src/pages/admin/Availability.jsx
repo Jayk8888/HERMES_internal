@@ -5,18 +5,27 @@ import Field from '../../components/ui/Field'
 import InlineAlert from '../../components/ui/InlineAlert'
 import Select from '../../components/ui/Select'
 import TextInput from '../../components/ui/TextInput'
-import { useFetch } from '../../hooks/useFetch'
+import { invalidateFetchCache, useFetch } from '../../hooks/useFetch'
+import { useSessionState } from '../../hooks/useSessionState'
 import AdminSection from './components/AdminSection'
 import { AdminAvailabilitySkeleton, AdminErrorState } from './components/AdminPageState'
 import { createAvailabilitySlot, deleteAvailabilitySlot, loadAdminAvailability, updateAvailabilitySlot } from './lib/loaders'
 import { ADMIN_DAY_ORDER } from './lib/normalizers'
 import { validateAvailabilitySlot } from './lib/validators'
 
+const EMPTY_AVAILABILITY_DRAFT = {
+  day: 'Monday',
+  startTime: '',
+  endTime: '',
+}
+
 export default function AdminAvailability() {
-  const { data, loading, error, refetch } = useFetch(loadAdminAvailability, [])
-  const [doctorId, setDoctorId] = React.useState('')
-  const [editing, setEditing] = React.useState(null)
-  const [draft, setDraft] = React.useState({ doctorId: '', day: 'Monday', startTime: '', endTime: '' })
+  const { data, loading, error, refetch } = useFetch(loadAdminAvailability, [], {
+    key: 'admin:availability',
+  })
+  const [doctorId, setDoctorId] = useSessionState('admin:availability:doctorId', '')
+  const [editing, setEditing, clearEditing] = useSessionState('admin:availability:editing', null)
+  const [draft, setDraft, clearDraft] = useSessionState('admin:availability:draft', EMPTY_AVAILABILITY_DRAFT)
   const [errors, setErrors] = React.useState({})
   const [message, setMessage] = React.useState(null)
   const [saving, setSaving] = React.useState(false)
@@ -24,9 +33,8 @@ export default function AdminAvailability() {
   React.useEffect(() => {
     if (!doctorId && data?.length) {
       setDoctorId(data[0].id)
-      setDraft(current => ({ ...current, doctorId: data[0].id }))
     }
-  }, [data, doctorId])
+  }, [data, doctorId, setDoctorId])
 
   if (loading) return <PageLayout width="wide"><AdminAvailabilitySkeleton /></PageLayout>
   if (error) return <PageLayout width="wide"><AdminErrorState error={error} onRetry={refetch} /></PageLayout>
@@ -35,13 +43,8 @@ export default function AdminAvailability() {
   const currentSlots = selectedDoctor?.slots ?? []
 
   function resetDraft() {
-    setEditing(null)
-    setDraft({
-      doctorId,
-      day: 'Monday',
-      startTime: '',
-      endTime: '',
-    })
+    clearEditing(null)
+    clearDraft(EMPTY_AVAILABILITY_DRAFT)
     setErrors({})
   }
 
@@ -70,6 +73,8 @@ export default function AdminAvailability() {
           end_time: draft.endTime,
         })
       }
+      invalidateFetchCache('admin:availability')
+      invalidateFetchCache('admin:dashboard')
       setMessage({ tone: 'success', text: editing ? 'Slot updated' : 'Slot created' })
       resetDraft()
       await refetch()
@@ -84,6 +89,8 @@ export default function AdminAvailability() {
     setMessage(null)
     try {
       await deleteAvailabilitySlot(slotId)
+      invalidateFetchCache('admin:availability')
+      invalidateFetchCache('admin:dashboard')
       setMessage({ tone: 'success', text: 'Slot deleted' })
       if (editing?.id === slotId) {
         resetDraft()
@@ -97,7 +104,6 @@ export default function AdminAvailability() {
   function beginEdit(slot) {
     setEditing(slot)
     setDraft({
-      doctorId,
       day: slot.day,
       startTime: slot.startTime,
       endTime: slot.endTime,
@@ -112,8 +118,7 @@ export default function AdminAvailability() {
             <Field label="Doctor">
               <Select value={doctorId} onChange={event => {
                 setDoctorId(event.target.value)
-                setDraft(current => ({ ...current, doctorId: event.target.value }))
-                setEditing(null)
+                clearEditing(null)
               }}>
                 {data.map(doctor => <option key={doctor.id} value={doctor.id}>{doctor.fullName}</option>)}
               </Select>

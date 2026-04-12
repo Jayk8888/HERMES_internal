@@ -6,7 +6,7 @@ import InlineAlert from '../../components/ui/InlineAlert'
 import Select from '../../components/ui/Select'
 import TextInput from '../../components/ui/TextInput'
 import { useAuth } from '../../hooks/useAuth.jsx'
-import { useFetch } from '../../hooks/useFetch'
+import { invalidateFetchCache, useFetch } from '../../hooks/useFetch'
 import AdminSection from './components/AdminSection'
 import { AdminErrorState, AdminProfileSkeleton } from './components/AdminPageState'
 import { loadOwnAdminProfile, saveAdminUser } from './lib/loaders'
@@ -15,6 +15,7 @@ export default function AdminProfile() {
   const { user } = useAuth()
   const { data, loading, error, refetch } = useFetch(() => loadOwnAdminProfile(user?.id), [user?.id], {
     enabled: Boolean(user?.id),
+    key: user?.id ? `admin:profile:${user.id}` : null,
   })
   const [draft, setDraft] = React.useState({ fullName: '', phoneNumber: '', gender: '' })
   const [saving, setSaving] = React.useState(false)
@@ -43,6 +44,10 @@ export default function AdminProfile() {
         p_gender: draft.gender || null,
         p_role: 'admin',
       })
+      invalidateFetchCache(`admin:profile:${data.id}`)
+      invalidateFetchCache('admin:users')
+      invalidateFetchCache(`admin:user:${data.id}`)
+      invalidateFetchCache('admin:dashboard')
       setMessage({ tone: 'success', text: 'Profile saved' })
       await refetch()
     } catch (saveError) {

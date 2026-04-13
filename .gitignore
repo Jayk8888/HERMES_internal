@@ -18,3 +18,4 @@ backend/supabase/migrations/.trash/
 .vscode/
 .idea/
 *.swp
+.agents/

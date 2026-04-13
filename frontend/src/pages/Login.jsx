@@ -30,6 +30,7 @@ export default function Login() {
 
   if (profile?.role === 'patient') return <Navigate to="/patient" replace />
   if (profile?.role === 'doctor') return <Navigate to="/doctor" replace />
+  if (profile?.role === 'admin') return <Navigate to="/admin" replace />
 
   return (
     <AuthShell

@@ -6,7 +6,7 @@ import Field from '../../components/ui/Field'
 import InlineAlert from '../../components/ui/InlineAlert'
 import Select from '../../components/ui/Select'
 import TextInput from '../../components/ui/TextInput'
-import { useFetch } from '../../hooks/useFetch'
+import { invalidateFetchCache, useFetch } from '../../hooks/useFetch'
 import AdminSection from './components/AdminSection'
 import { AdminEmptyState, AdminErrorState, AdminUserDetailSkeleton } from './components/AdminPageState'
 import { loadAdminUserDetail, saveAdminUser } from './lib/loaders'
@@ -27,7 +27,9 @@ function buildDraft(user) {
 export default function AdminUserDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { data, loading, error, refetch } = useFetch(() => loadAdminUserDetail(id), [id])
+  const { data, loading, error, refetch } = useFetch(() => loadAdminUserDetail(id), [id], {
+    key: `admin:user:${id}`,
+  })
   const [draft, setDraft] = React.useState(null)
   const [saving, setSaving] = React.useState(false)
   const [message, setMessage] = React.useState(null)
@@ -55,6 +57,9 @@ export default function AdminUserDetail() {
         p_specialization: data.role === 'doctor' ? draft.specialization || null : null,
         p_license_no: data.role === 'doctor' ? draft.licenseNo || null : null,
       })
+      invalidateFetchCache('admin:users')
+      invalidateFetchCache(`admin:user:${data.id}`)
+      invalidateFetchCache('admin:dashboard')
       setMessage({ tone: 'success', text: 'User saved' })
       await refetch()
     } catch (saveError) {

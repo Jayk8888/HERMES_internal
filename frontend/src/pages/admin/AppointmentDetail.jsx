@@ -6,7 +6,7 @@ import Field from '../../components/ui/Field'
 import InlineAlert from '../../components/ui/InlineAlert'
 import Select from '../../components/ui/Select'
 import TextInput from '../../components/ui/TextInput'
-import { useFetch } from '../../hooks/useFetch'
+import { invalidateFetchCache, useFetch } from '../../hooks/useFetch'
 import AdminSection from './components/AdminSection'
 import { AdminAppointmentDetailSkeleton, AdminEmptyState, AdminErrorState } from './components/AdminPageState'
 import { loadAdminAppointmentDetail, updateAdminAppointment } from './lib/loaders'
@@ -14,7 +14,9 @@ import { validateAppointmentForm } from './lib/validators'
 
 export default function AdminAppointmentDetail() {
   const { id } = useParams()
-  const { data, loading, error, refetch } = useFetch(() => loadAdminAppointmentDetail(id), [id])
+  const { data, loading, error, refetch } = useFetch(() => loadAdminAppointmentDetail(id), [id], {
+    key: `admin:appointment:${id}`,
+  })
   const [draft, setDraft] = React.useState({ scheduledAt: '', status: 'scheduled' })
   const [errors, setErrors] = React.useState({})
   const [saving, setSaving] = React.useState(false)
@@ -48,6 +50,10 @@ export default function AdminAppointmentDetail() {
         p_scheduled_at: new Date(draft.scheduledAt).toISOString(),
         p_status: draft.status,
       })
+      invalidateFetchCache('admin:appointments')
+      invalidateFetchCache(`admin:appointment:${data.id}`)
+      invalidateFetchCache('admin:dashboard')
+      invalidateFetchCache('admin:records')
       setMessage({ tone: 'success', text: 'Appointment updated' })
       await refetch()
     } catch (saveError) {
@@ -66,7 +72,7 @@ export default function AdminAppointmentDetail() {
       width="wide"
       actions={data.hasRecord
         ? <Button as={Link} to={`/admin/records/${data.recordId}`} size="small" variant="secondary">Open record</Button>
-        : <Button as={Link} to="/admin/records" size="small">Create record</Button>}
+        : <Button as={Link} to={`/admin/records?appointmentId=${data.id}`} size="small">Create record</Button>}
     >
       <form className="space-y-6" onSubmit={handleSave}>
         {message ? <InlineAlert tone={message.tone} message={message.text} /> : null}
@@ -96,7 +102,7 @@ export default function AdminAppointmentDetail() {
           {data.hasRecord ? (
             <Button as={Link} to={`/admin/records/${data.recordId}`} variant="secondary">Open record</Button>
           ) : (
-            <Button as={Link} to="/admin/records">Go to needs-record queue</Button>
+            <Button as={Link} to={`/admin/records?appointmentId=${data.id}`}>Create record</Button>
           )}
         </AdminSection>
 

@@ -6,7 +6,8 @@ import Field from '../../components/ui/Field'
 import InlineAlert from '../../components/ui/InlineAlert'
 import Select from '../../components/ui/Select'
 import TextInput from '../../components/ui/TextInput'
-import { useFetch } from '../../hooks/useFetch'
+import { invalidateFetchCache, useFetch } from '../../hooks/useFetch'
+import { useSessionState } from '../../hooks/useSessionState'
 import AdminDataTable, { AdminLinkCell, AdminStatusCell } from './components/AdminDataTable'
 import AdminFilterBar from './components/AdminFilterBar'
 import AdminSection from './components/AdminSection'
@@ -15,11 +16,29 @@ import { createAdminAppointment, loadAdminAppointments, loadAdminUsers } from '.
 import { filterAppointments } from './lib/normalizers'
 import { validateAppointmentForm } from './lib/validators'
 
+const EMPTY_APPOINTMENT_FILTERS = {
+  status: 'all',
+  doctorId: 'all',
+  patientId: 'all',
+  date: '',
+}
+
+const EMPTY_APPOINTMENT_DRAFT = {
+  patientId: '',
+  doctorId: '',
+  scheduledAt: '',
+  status: 'scheduled',
+}
+
 export default function AdminAppointments() {
-  const appointmentsFetch = useFetch(loadAdminAppointments, [])
-  const usersFetch = useFetch(loadAdminUsers, [])
-  const [filters, setFilters] = React.useState({ status: 'all', doctorId: 'all', patientId: 'all', date: '' })
-  const [draft, setDraft] = React.useState({ patientId: '', doctorId: '', scheduledAt: '', status: 'scheduled' })
+  const appointmentsFetch = useFetch(loadAdminAppointments, [], {
+    key: 'admin:appointments',
+  })
+  const usersFetch = useFetch(loadAdminUsers, [], {
+    key: 'admin:users',
+  })
+  const [filters, setFilters] = useSessionState('admin:appointments:filters', EMPTY_APPOINTMENT_FILTERS)
+  const [draft, setDraft, clearDraft] = useSessionState('admin:appointments:draft', EMPTY_APPOINTMENT_DRAFT)
   const [errors, setErrors] = React.useState({})
   const [saving, setSaving] = React.useState(false)
   const [message, setMessage] = React.useState(null)
@@ -60,7 +79,10 @@ export default function AdminAppointments() {
         p_doctor_id: draft.doctorId,
         p_scheduled_at: new Date(draft.scheduledAt).toISOString(),
       })
-      setDraft({ patientId: '', doctorId: '', scheduledAt: '', status: 'scheduled' })
+      invalidateFetchCache('admin:appointments')
+      invalidateFetchCache('admin:dashboard')
+      invalidateFetchCache('admin:records')
+      clearDraft(EMPTY_APPOINTMENT_DRAFT)
       setMessage({ tone: 'success', text: 'Appointment created' })
       await appointmentsFetch.refetch()
     } catch (saveError) {
@@ -143,7 +165,7 @@ export default function AdminAppointments() {
               render: row => (
                 row.hasRecord
                   ? <Button as={Link} to={`/admin/records/${row.recordId}`} variant="secondary" size="small">Open</Button>
-                  : <AdminStatusCell tone="warning">Missing</AdminStatusCell>
+                  : <Button as={Link} to={`/admin/records?appointmentId=${row.id}`} size="small">Create record</Button>
               ),
             },
           ]}

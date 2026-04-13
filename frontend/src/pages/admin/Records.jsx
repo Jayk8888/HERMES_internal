@@ -1,5 +1,5 @@
 import React from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import PageLayout from '../../components/layout/PageLayout'
 import Button from '../../components/ui/Button'
 import Field from '../../components/ui/Field'
@@ -7,7 +7,8 @@ import InlineAlert from '../../components/ui/InlineAlert'
 import Select from '../../components/ui/Select'
 import Textarea from '../../components/ui/Textarea'
 import TextInput from '../../components/ui/TextInput'
-import { useFetch } from '../../hooks/useFetch'
+import { invalidateFetchCache, useFetch } from '../../hooks/useFetch'
+import { useSessionState } from '../../hooks/useSessionState'
 import AdminDataTable, { AdminLinkCell } from './components/AdminDataTable'
 import AdminQueueList from './components/AdminQueueList'
 import AdminSection from './components/AdminSection'
@@ -16,13 +17,46 @@ import { loadAdminAppointments, loadAdminRecords, saveAdminMedicalRecord } from 
 import { buildRecordQueue } from './lib/normalizers'
 import { validateMedicalRecordForm } from './lib/validators'
 
+const EMPTY_RECORD_DRAFT = {
+  appointmentId: '',
+  description: '',
+  prescription: '',
+  vitalsText: '',
+}
+
 export default function AdminRecords() {
-  const recordsFetch = useFetch(loadAdminRecords, [])
-  const appointmentsFetch = useFetch(loadAdminAppointments, [])
-  const [draft, setDraft] = React.useState({ appointmentId: '', description: '', prescription: '', vitalsText: '' })
+  const [searchParams, setSearchParams] = useSearchParams()
+  const recordsFetch = useFetch(loadAdminRecords, [], {
+    key: 'admin:records',
+  })
+  const appointmentsFetch = useFetch(loadAdminAppointments, [], {
+    key: 'admin:appointments',
+  })
+  const [draft, setDraft, clearDraft] = useSessionState('admin:records:draft', EMPTY_RECORD_DRAFT)
   const [errors, setErrors] = React.useState({})
   const [saving, setSaving] = React.useState(false)
   const [message, setMessage] = React.useState(null)
+  const queue = buildRecordQueue(appointmentsFetch.data ?? [])
+  const queueOptions = queue.map(item => ({
+    value: item.id,
+    label: `${item.patientName} · ${item.doctorName} · ${item.scheduledLabel}`,
+  }))
+  const requestedAppointmentId = searchParams.get('appointmentId')
+
+  React.useEffect(() => {
+    if (!requestedAppointmentId) return
+    if (!queue.some(item => item.id === requestedAppointmentId)) return
+
+    setDraft(current => (
+      current.appointmentId === requestedAppointmentId
+        ? current
+        : { ...current, appointmentId: requestedAppointmentId }
+    ))
+
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.delete('appointmentId')
+    setSearchParams(nextParams, { replace: true })
+  }, [queue, requestedAppointmentId, searchParams, setDraft, setSearchParams])
 
   if (recordsFetch.loading || appointmentsFetch.loading) {
     return <PageLayout width="wide"><AdminRecordsSkeleton /></PageLayout>
@@ -34,12 +68,6 @@ export default function AdminRecords() {
       void appointmentsFetch.refetch()
     }} /></PageLayout>
   }
-
-  const queue = buildRecordQueue(appointmentsFetch.data)
-  const queueOptions = queue.map(item => ({
-    value: item.id,
-    label: `${item.patientName} · ${item.doctorName} · ${item.scheduledLabel}`,
-  }))
 
   async function handleSave(event) {
     event.preventDefault()
@@ -57,7 +85,10 @@ export default function AdminRecords() {
         p_prescription: draft.prescription || null,
         p_vitals: draft.vitalsText ? JSON.parse(draft.vitalsText) : null,
       })
-      setDraft({ appointmentId: '', description: '', prescription: '', vitalsText: '' })
+      invalidateFetchCache('admin:records')
+      invalidateFetchCache('admin:appointments')
+      invalidateFetchCache('admin:dashboard')
+      clearDraft(EMPTY_RECORD_DRAFT)
       setMessage({ tone: 'success', text: 'Record saved' })
       await recordsFetch.refetch()
       await appointmentsFetch.refetch()

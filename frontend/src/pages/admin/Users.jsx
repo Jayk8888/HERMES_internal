@@ -13,7 +13,9 @@ import { filterUsers } from './lib/normalizers'
 import Button from '../../components/ui/Button'
 
 export default function AdminUsers() {
-  const { data, loading, error, refetch } = useFetch(loadAdminUsers, [])
+  const { data, loading, error, refetch } = useFetch(loadAdminUsers, [], {
+    key: 'admin:users',
+  })
   const [search, setSearch] = React.useState('')
   const [role, setRole] = React.useState('all')
 

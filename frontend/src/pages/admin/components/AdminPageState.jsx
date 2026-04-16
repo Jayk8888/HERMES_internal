@@ -60,9 +60,27 @@ function QueueSkeleton() {
   )
 }
 
+function MetricCardSkeleton() {
+  return (
+    <Card tone="subtle">
+      <div className="space-y-3">
+        <Skeleton className="h-3 w-28 rounded-md" />
+        <Skeleton className="h-9 w-20 rounded-md" />
+        <Skeleton className="h-3 w-40 rounded-md" />
+      </div>
+    </Card>
+  )
+}
+
 export function AdminDashboardSkeleton() {
   return (
     <div className="space-y-6">
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, index) => <MetricCardSkeleton key={index} />)}
+      </section>
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {Array.from({ length: 3 }).map((_, index) => <MetricCardSkeleton key={index} />)}
+      </section>
       <section className="grid gap-6 xl:grid-cols-3">
         <QueueSkeleton />
         <QueueSkeleton />

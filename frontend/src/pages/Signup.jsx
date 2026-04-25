@@ -8,7 +8,7 @@ import TextInput from '../components/ui/TextInput'
 import { signUp } from '../features/auth/authService'
 import { cn } from '../lib/cn'
 
-const ROLE_OPTIONS = ['patient', 'doctor']
+const ROLE_OPTIONS = ['patient', 'doctor', 'admin']
 const GENDER_OPTIONS = ['male', 'female', 'other']
 
 function ToggleGroup({ value, onChange, options }) {
@@ -62,7 +62,7 @@ export default function Signup() {
     <AuthShell
       eyebrow="Registration"
       title="Create your HERMES account"
-      description="Choose your role, capture your identity details, and continue into the correct workspace."
+      description="Choose your role, capture your identity details, and continue into the correct workspace, including admin demo access."
       footer={(
         <>
           Already have an account?{' '}
